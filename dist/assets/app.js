@@ -803,8 +803,8 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
     <div class="shave" id="shave">
       <header class="shave-head">
         <p class="eyebrow"><span class="bits"><span class="px o"></span><span class="px t"></span><span class="px l"></span></span>World's Greatest Shave</p>
-        <h1 class="name">How fast can you <em>shave my head?</em></h1>
-        <p class="lede">I'm shaving my head for World's Greatest Shave to raise money for people living with blood cancer. Donate, and every $${price} gets you a timed go at shaving the pixel version of me, plus a go at shaving your own avatar.</p>
+        <h1 class="name">How fast can you shave my <em>pixel head?</em></h1>
+        <p class="lede">I'm raising money for World's Greatest Shave to support people living with blood cancer. Donate, and every $${price} gets you a timed go at shaving the pixel version of me, plus a go at shaving your own avatar.</p>
         <div class="head-ctas">
           <a class="pbtn" href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a>
           <button type="button" class="textlink" onClick=${toGame}>Skip to the game ↓</button>
@@ -850,7 +850,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
       </section>
 
       <section class="step" id="step-shave" aria-labelledby="step-4">
-        <h2 class="step-h" id="step-4"><span class="step-n">04</span>Shave my head</h2>
+        <h2 class="step-h" id="step-4"><span class="step-n">04</span>Shave my pixel head</h2>
         <ul class="points">
           <li><span>Each token gets you <strong>two runs</strong>: a ranked run on pixel me, whose time can go on the leaderboard, and a run shaving your own avatar.</span></li>
           <li><span>Hold and drag to run the clippers. On a phone, press and drag with your finger.</span></li>

@@ -1,0 +1,42 @@
+# Cloudflare Worker for Joash's site. src/worker.js answers /api/...; every other path is a file from dist/.
+# Keys go in the Cloudflare dashboard as Secrets (GEMINI_API_KEY and ADMIN_PASSWORD), never in this file.
+# Plain settings go under [vars] below, because Cloudflare takes them from this file.
+#
+# KEEP THESE THE SAME IN EVERY VERSION: `name`, the [[durable_objects.bindings]] block and the [[migrations]] block.
+# The leaderboard, donations and receipts are saved under them. Changing one starts a new, empty database.
+# The name below must also match the Worker's name in the Cloudflare dashboard exactly.
+name = "joash-site"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+# /api/* always reaches the Worker; a path with no file gets the site's 404 page
+run_worker_first = ["/api/*"]
+not_found_handling = "404-page"
+
+# Where everything people do is saved: one Durable Object with its own SQLite database (free plan)
+[[durable_objects.bindings]]
+name = "STORE"
+class_name = "Store"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Store"]
+
+[observability]
+enabled = true
+
+[vars]
+# Joash's World's Greatest Shave page. Receipts only count if they show a donation to this person and page.
+FUNDRAISER_NAME = "Joash Jobson"
+FUNDRAISER_URL = "https://www.worldsgreatestshave.com/fundraisers/joashj"
+# Dollars (AUD) per token. Each person's total is rounded to the nearest token, so at 20, $29 is 1 token and $31 is 2.
+TOKEN_PRICE_AUD = "20"
+# Receipts above this amount always go to Joash to check by hand, even when Gemini reads them clearly.
+AUTO_APPROVE_MAX_AUD = "500"
+# Gemini model for reading receipts (free tier). "gemini-flash-lite-latest" always points at Google's newest Flash-Lite.
+GEMINI_MODEL = "gemini-flash-lite-latest"
+# Most Gemini calls per day. Past this, receipts wait for Joash instead, so the free tier is never exceeded.
+GEMINI_DAILY_LIMIT = "500"

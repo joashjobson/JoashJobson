@@ -1,0 +1,7 @@
+{
+  "name": "joash-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Joash Jobson's website and World's Greatest Shave pixel-shaving game, on a Cloudflare Worker."
+}

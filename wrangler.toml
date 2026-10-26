@@ -1,5 +1,6 @@
 # Cloudflare Worker for Joash's site. src/worker.js answers /api/...; every other path is a file from dist/.
-# Keys go in the Cloudflare dashboard as Secrets (GEMINI_API_KEY and ADMIN_PASSWORD), never in this file.
+# Keys go in the Cloudflare dashboard as Secrets (GROQ_API_KEY and ADMIN_PASSWORD), never in this file.
+# Optional donation emails need two more Secrets: RESEND_API_KEY (from resend.com) and NOTIFY_EMAIL (where to send them).
 # Plain settings go under [vars] below, because Cloudflare takes them from this file.
 #
 # KEEP THESE THE SAME IN EVERY VERSION: `name`, the [[durable_objects.bindings]] block and the [[migrations]] block.
@@ -43,9 +44,8 @@ FUNDRAISER_NAME = "Joash Jobson"
 FUNDRAISER_URL = "https://www.worldsgreatestshave.com/fundraisers/joashj"
 # Dollars (AUD) per token. Each person's total is rounded to the nearest token, so at 20, $29 is 1 token and $31 is 2.
 TOKEN_PRICE_AUD = "20"
-# Receipts above this amount always go to Joash to check by hand, even when Gemini reads them clearly.
-AUTO_APPROVE_MAX_AUD = "500"
-# Gemini model for reading receipts (free tier). "gemini-flash-lite-latest" always points at Google's newest Flash-Lite.
-GEMINI_MODEL = "gemini-flash-lite-latest"
-# Most Gemini calls per day. Past this, receipts wait for Joash instead, so the free tier is never exceeded.
-GEMINI_DAILY_LIMIT = "500"
+# Groq model that reads receipts (free plan). It must be a Groq vision model that supports strict JSON schema output.
+GROQ_MODEL = "qwen/qwen3.8-27b"
+# Most receipts Groq checks per day. Each receipt uses about 3,000 of the free plan's 200,000 daily tokens, so 60 stays under it.
+# Past this, receipts wait in the queue until the next day.
+GROQ_DAILY_LIMIT = "60"

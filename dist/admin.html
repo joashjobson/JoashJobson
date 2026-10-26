@@ -20,7 +20,7 @@
 <main class="adm">
   <form id="login" class="adm-login">
     <h1 class="name">Admin</h1>
-    <p class="lede">Check receipts by hand, tidy the leaderboard, and download a backup.</p>
+    <p class="lede">See every receipt, tidy the leaderboard, and download a backup.</p>
     <label for="pw">Admin password<input id="pw" type="password" autocomplete="current-password" required></label>
     <button class="pbtn" type="submit">Sign in</button>
     <p class="err" id="login-err" role="alert"></p>
@@ -28,14 +28,14 @@
   <div id="panel" hidden>
     <div class="adm-bar">
       <div class="tabs" role="tablist">
-        <button role="tab" data-tab="pending" aria-selected="true">To check</button>
+        <button role="tab" data-tab="ok" aria-selected="true">Added</button>
         <button role="tab" data-tab="rejected" aria-selected="false">Turned down</button>
-        <button role="tab" data-tab="ok" aria-selected="false">Approved</button>
         <button role="tab" data-tab="players" aria-selected="false">People</button>
       </div>
       <div class="adm-actions"><button class="textlink" id="backup" type="button">Download backup</button><button class="textlink" id="signout" type="button">Sign out</button></div>
     </div>
     <p class="adm-msg" id="msg" role="status"></p>
+    <p class="adm-msg" id="queue"></p>
     <div id="list"></div>
   </div>
 </main>

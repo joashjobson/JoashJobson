@@ -1,10 +1,10 @@
-// Joash's admin page: check receipts by hand, hide people from the leaderboard, and download a backup.
+// Joash's admin page: see every receipt (each one is decided automatically), hide people from the leaderboard, and download a backup.
 // Everything shown here comes from visitors, so it's added as text, never as HTML.
 (() => {
   const $ = (s) => document.querySelector(s);
   let pw = '';
   try { pw = sessionStorage.getItem('jj-admin') || ''; } catch (_) { /* no storage */ }
-  let tab = 'pending';
+  let tab = 'ok';
   const AUD = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 2 });
   const when = (t) => t ? new Date(t).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
 
@@ -53,15 +53,19 @@
 
   function receiptCard(r) {
     const read = r.reading || {};
-    const imgBox = el('div', { class: 'adm-img' }, r.has_image ? 'Loading…' : 'No file kept');
-    if (r.has_image) showImage(r.id, imgBox);
+    // Screenshots aren't kept any more; only receipts from older versions can still have one
+    const imgBox = r.has_image ? el('div', { class: 'adm-img' }, 'Loading…') : null;
+    if (imgBox) showImage(r.id, imgBox);
     const amount = el('input', { type: 'number', min: '1', step: '0.01', value: r.amount ?? read.amount_aud ?? '', 'aria-label': 'Amount in AUD' });
     const facts = [
       ['Donated to', r.donated_to || read.donated_to || '—'],
       ['Donor', r.donor || read.donor_name || '—'],
       ['Amount read', read.amount_aud != null ? AUD.format(read.amount_aud) : (r.amount != null ? AUD.format(r.amount) : '—')],
       ['Receipt no.', r.ref || read.receipt_id || '—'],
-      ['Gemini sure?', read.confidence != null ? Math.round(read.confidence * 100) + '%' : (read.busy ? 'Gemini was busy' : 'Not read')],
+      ['Looks genuine?', read.looks_genuine == null ? '—' : read.looks_genuine ? 'Yes' : 'No'],
+      ['AI sure?', read.confidence != null ? Math.round(read.confidence * 100) + '%' : 'Not read'],
+      r.status !== 'ok' && ['Why not', r.reason || '—'],
+      r.status !== 'ok' && read.problem && ['AI noticed', String(read.problem).slice(0, 200)],
       ['Leaderboard name', r.player_name || '—'],
       ['Uploaded', when(r.created)]
     ];
@@ -69,12 +73,12 @@
       try { await post('review', { id: r.id, action, amount: amount.value }); say(action === 'approve' ? 'Approved. Their tokens are added.' : 'Turned down.'); load(); }
       catch (e) { say(e.message, true); }
     };
-    return el('article', { class: 'adm-card' }, imgBox,
+    return el('article', { class: 'adm-card' + (imgBox ? ' with-img' : '') }, imgBox,
       el('div', { class: 'adm-info' },
-        el('dl', {}, facts.map(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])),
+        el('dl', {}, facts.filter(Boolean).map(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])),
         r.status === 'ok'
           ? el('div', { class: 'adm-do' }, el('span', {}, 'Counted ' + AUD.format(r.amount || 0)), el('button', { class: 'textlink', type: 'button', onclick: () => confirm('Undo this receipt and take the amount off their total?') && act('reject') }, 'Undo'))
-          : el('div', { class: 'adm-do' }, el('label', {}, '$', amount), el('button', { class: 'pbtn', type: 'button', onclick: () => act('approve') }, 'Approve'),
+          : el('div', { class: 'adm-do' }, el('span', { class: 'adm-note' }, 'Only if you know it was real:'), el('label', {}, '$', amount), el('button', { class: 'pbtn', type: 'button', onclick: () => act('approve') }, 'Add it anyway'),
             r.status === 'pending' && el('button', { class: 'textlink', type: 'button', onclick: () => act('reject') }, 'Turn down'))));
   }
 
@@ -84,7 +88,8 @@
       el('td', {}, p.name || 'Anonymous'), el('td', {}, AUD.format(p.donated)), el('td', {}, p.best == null ? '—' : p.best.toFixed(2) + 's'),
       el('td', {}, String(Math.max(0, p.tokens))),
       el('td', {}, el('button', { class: 'textlink', type: 'button', onclick: () => toggle({ hidden: !p.hidden }, p.hidden ? 'Shown on the leaderboard again.' : 'Hidden from the leaderboard.') }, p.hidden ? 'Show' : 'Hide'),
-        ' ', p.best != null && el('button', { class: 'textlink', type: 'button', onclick: () => confirm('Clear their best time?') && toggle({ clearTime: true }, 'Time cleared.') }, 'Clear time')));
+        ' ', p.best != null && el('button', { class: 'textlink', type: 'button', onclick: () => confirm('Clear their best time?') && toggle({ clearTime: true }, 'Time cleared.') }, 'Clear time'),
+        ' ', el('button', { class: 'textlink', type: 'button', onclick: () => confirm("Delete everything about this person? Their name, avatar, times, tokens and receipt details go for good. This can't be undone.") && toggle({ remove: true }, 'Deleted.') }, 'Delete')));
   }
 
   async function load() {
@@ -98,8 +103,9 @@
           ? el('table', { class: 'adm-table' }, el('thead', {}, el('tr', {}, ['Name', 'Donated', 'Best', 'Tokens left', ''].map(h => el('th', {}, h)))), el('tbody', {}, people.map(playerRow)))
           : el('p', { class: 'empty' }, 'Nobody has donated or played a ranked run yet.'));
       } else {
-        const rs = await (await api('receipts?status=' + tab)).json();
-        const none = { pending: 'Nothing to check. Every receipt so far was clear enough to add automatically.', rejected: 'No receipts have been turned down.', ok: 'No receipts approved yet.' }[tab];
+        const [rs, q] = await Promise.all([api('receipts?status=' + tab).then(r => r.json()), api('queue').then(r => r.json())]);
+        $('#queue').textContent = q.queued ? `${q.queued} receipt${q.queued === 1 ? ' is' : 's are'} waiting in the queue because the receipt checker was busy. They'll be checked automatically.` : '';
+        const none = { rejected: 'No receipts have been turned down.', ok: 'No receipts added yet.' }[tab];
         list.replaceChildren(...(rs.length ? rs.map(receiptCard) : [el('p', { class: 'empty' }, none)]));
       }
     } catch (e) { list.replaceChildren(el('p', { class: 'err' }, e.message)); }

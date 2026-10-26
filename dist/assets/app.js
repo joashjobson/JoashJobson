@@ -4,7 +4,7 @@ const html = htm.bind(React.createElement);
 // The artifact preview sets JJ_PREVIEW: it routes with #hash and keeps everything in memory.
 // The live site has real pages (/ and /shave) and saves to the Worker at /api.
 const PREVIEW = !!window.JJ_PREVIEW;
-const PAGES = PREVIEW ? { home: '#home', shave: '#shave' } : { home: '/', shave: '/shave' };
+const PAGES = PREVIEW ? { home: '#home', shave: '#shave', privacy: '#privacy' } : { home: '/', shave: '/shave', privacy: '/privacy' };
 
 /* ---------- Pixel portraits: 64x64, shaded with hue-shifted colour ramps, built from preset parts ---------- */
 const ART = 64;
@@ -359,7 +359,7 @@ function paintHead(img, hp, head = HEAD) {
         const lvl = Math.ceil(h);
         if (lvl >= head.max[i]) c = head.base[i];
         else if (lvl >= 2) c = mix(head.base[i], R[2], .35);
-        else c = ((x + y) & 1) ? R[1] : (head.under[i] || null);   // stubble
+        else c = ((x + y) & 1) ? R[1] : (head.under[i] || R[2]);   // stubble, dark even where there's no skin under it
       }
     } else if (K[i] === SHADE) c = hairNear(x, y) ? head.base[i] : head.under[i];
     const o = i * 4;
@@ -405,7 +405,7 @@ function AvatarMaker({ look, onChange }) {
 }
 
 /* ---------- 1. Pixel-shaving game ---------- */
-function ShaveGame({ tokens, freeLeft, onStart, onWin, playerName, look, savedBest }) {
+function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onWin, playerName, look, savedBest }) {
   const stageRef = useRef(null), canvasRef = useRef(null);
   const G = useRef(null);
   const [phase, setPhase] = useState('idle');    // idle | playing | won
@@ -435,11 +435,12 @@ function ShaveGame({ tokens, freeLeft, onStart, onWin, playerName, look, savedBe
     setHud({ t: 0, pct: 0, eff: 1 });
   }
 
-  // Ranked runs cost a token. Everyone gets one free run (practice or their own avatar); after that, avatar runs cost a token too.
+  // One token buys a ranked run on Joash plus a run on your own avatar. Everyone also gets one free run (practice or their own avatar).
+  const canRanked = rankedLeft > 0 || tokens > 0, canOwn = freeLeft || ownLeft > 0 || tokens > 0;
   async function start(m) {
     if (busy) return;
     if (m === 'own' && !hasHair(look)) return;
-    if ((m === 'ranked' || !freeLeft) && tokens < 1) return;
+    if ((m === 'ranked' && !canRanked) || (m === 'own' && !canOwn)) return;
     setBusy(true); setErr('');
     let run;
     try { run = await onStart(m); }
@@ -481,7 +482,8 @@ function ShaveGame({ tokens, freeLeft, onStart, onWin, playerName, look, savedBe
     fit();
     const ro = new ResizeObserver(fit); ro.observe(canvas);
     let raf, last = performance.now();
-    const css = () => { const s = getComputedStyle(document.documentElement); return { ink: s.getPropertyValue('--ink').trim(), accent: s.getPropertyValue('--accent').trim(), accent2: s.getPropertyValue('--accent2').trim(), pop: s.getPropertyValue('--pop').trim(), gold: s.getPropertyValue('--gold').trim(), warn: s.getPropertyValue('--warn').trim() }; };
+    // Colours come from the canvas, because the arcade cabinet sets its own
+    const css = () => { const s = getComputedStyle(canvas); return { ink: s.getPropertyValue('--ink').trim(), accent: s.getPropertyValue('--accent').trim(), accent2: s.getPropertyValue('--accent2').trim(), pop: s.getPropertyValue('--pop').trim(), gold: s.getPropertyValue('--gold').trim(), warn: s.getPropertyValue('--warn').trim() }; };
 
     function frame(now) {
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -575,32 +577,36 @@ function ShaveGame({ tokens, freeLeft, onStart, onWin, playerName, look, savedBe
 
   const bog = hud.eff < 0.7;
   return html`
-    <div class="card">
-      <h3><span class="px t"></span>Shave the pixel head</h3>
+    <div class="card arcade">
+      <h3 class="marquee"><span class="coin" aria-hidden="true"></span>Shave the pixel head<span class="coin" aria-hidden="true"></span></h3>
       <div class="hud" aria-live="off">
         <div class="stat"><small>Time</small><b>${fmtTime(hud.t)}s</b></div>
         <div class="stat"><small>Cleared</small><b>${Math.min(100, Math.floor(hud.pct * 100))}%</b><div class="meter"><i style=${{ width: Math.min(100, hud.pct / WIN_AT * 100) + '%' }}></i></div></div>
         <div class="stat"><small>Your best</small><b>${best == null ? '–' : fmtTime(best) + 's'}</b></div>
         <div class="stat"><small>Clipper</small><b>${phase !== 'playing' ? 'Ready' : bog ? 'Too fast' : 'Smooth'}</b><div class=${'meter' + (bog ? ' bog' : '')}><i style=${{ width: Math.round(hud.eff * 100) + '%' }}></i></div></div>
       </div>
-      <div class="stage" ref=${stageRef}>
+      <div class=${'stage' + (phase === 'playing' ? '' : ' menu')} ref=${stageRef}>
         <canvas ref=${canvasRef} aria-label="Shaving game. Hold and drag over the hair to shave it." role="img"
           onPointerDown=${onDown} onPointerMove=${onMove} onPointerUp=${onUp} onPointerCancel=${onUp} onPointerLeave=${onLeave}></canvas>
         ${phase === 'idle' && html`
           <div class="overlay"><div class="box">
+            <p class="blink" aria-hidden="true">Press start</p>
             <h4>Ready to <em>shave?</em></h4>
-            <p>Hold and drag to run the clippers. A ranked run on Joash costs one token and can go on the board.${freeLeft ? ' Your first run is free, on Joash or your own avatar.' : ''}</p>
+            <p>Hold and drag to run the clippers. One token gets you a ranked run on Joash, which can go on the board, plus a run on your own avatar.${freeLeft ? ' Your first run is free, on Joash or your own avatar.' : ''}</p>
             <div class="btns">
-              <button class="btn hot" id="play-ranked" disabled=${tokens < 1 || busy} onClick=${() => start('ranked')}>Ranked run · 1 token</button>
+              <button class="btn hot" id="play-ranked" disabled=${!canRanked || busy} onClick=${() => start('ranked')}>Ranked run · ${rankedLeft > 0 ? 'paid' : '1 token'}</button>
               ${freeLeft && html`<button class="btn ghost" id="play-practice" disabled=${busy} onClick=${() => start('practice')}>Free practice</button>`}
-              <button class="btn ghost" id="play-own" disabled=${!hasHair(look) || busy || (!freeLeft && tokens < 1)} onClick=${() => start('own')}>Shave your avatar · ${freeLeft ? 'free' : '1 token'}</button>
+              <button class="btn ghost" id="play-own" disabled=${!hasHair(look) || busy || !canOwn} onClick=${() => start('own')}>Shave your avatar · ${freeLeft ? 'free' : ownLeft > 0 ? 'paid' : '1 token'}</button>
             </div>
             ${!hasHair(look) && html`<p>Your avatar is already bald. Pick a hairstyle to shave it.</p>`}
-            ${tokens < 1 && html`<p>${freeLeft ? 'Upload a receipt to earn tokens for ranked runs.' : "You've used your free run. Upload a receipt to earn tokens."}</p>`}
+            ${rankedLeft > 0 && html`<p>You've got a ranked run on Joash already paid for.</p>`}
+            ${ownLeft > 0 && html`<p>You've got a run on your own avatar already paid for.</p>`}
+            ${!canRanked && html`<p>${freeLeft ? 'Upload a receipt to earn tokens for ranked runs.' : "You've used your free run. Upload a receipt to earn tokens."}</p>`}
             ${err && html`<p class="err" role="alert">${err}</p>`}
           </div></div>`}
         ${phase === 'won' && result && html`
           <div class="overlay"><div class="box">
+            <p class="blink" aria-hidden="true">Stage clear</p>
             <h4>Clean <em>shave.</em></h4>
             <div class="bigtime">${fmtTime(result.secs)}s</div>
             <p>${Math.floor(result.pct * 100)}% cleared${best != null && result.secs <= best && mode !== 'own' ? '. A new personal best!' : '.'}</p>
@@ -621,7 +627,7 @@ function ShaveGame({ tokens, freeLeft, onStart, onWin, playerName, look, savedBe
           </div></div>`}
       </div>
       <div class="gamebar">
-        <span class="modechip">${phase === 'playing' ? (mode === 'ranked' ? 'Ranked run · Joash' : mode === 'own' ? 'Your avatar · for fun' : 'Practice · Joash') : 'Ranked runs are always on Joash'}</span>
+        <span class="modechip">1P · ${phase === 'playing' ? (mode === 'ranked' ? 'Ranked run · Joash' : mode === 'own' ? 'Your avatar · for fun' : 'Practice · Joash') : 'Ranked runs are always on Joash'}</span>
         ${phase === 'playing' && html`<button class="linkbtn" onClick=${quit}>Quit run</button>`}
       </div>
       <ul class="rules">
@@ -632,8 +638,8 @@ function ShaveGame({ tokens, freeLeft, onStart, onWin, playerName, look, savedBe
     </div>`;
 }
 
-// Gemini free tier: send a small JPEG (long edge 1024px) so each receipt costs few tokens and uploads fast.
-function shrinkForGemini(file, maxEdge = 1024) {
+// Send a small JPEG (long edge 1024px) so each receipt uploads fast and stays within the receipt checker's free limits.
+function shrinkReceipt(file, maxEdge = 1024) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -647,18 +653,15 @@ function shrinkForGemini(file, maxEdge = 1024) {
     img.src = URL.createObjectURL(file);
   });
 }
-const MAX_UPLOAD = 1900000;   // the Worker keeps unclear receipts for Joash to check, and stored files must stay under 2 MB
 const AUD2 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-// Screenshots and photos are shrunk to a small JPEG. PDFs (and photos this browser can't open, like HEIC) go as they are.
+// Screenshots and photos are shrunk to a small JPEG. The receipt checker reads images only, so PDFs are turned away here.
 async function prepareReceipt(file) {
-  const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
-  const image = /^image\//.test(file.type) || /\.(heic|heif)$/i.test(file.name || '');
-  if (!pdf && !image) throw new Error('Choose a screenshot or photo of your receipt, or a PDF.');
-  if (image) { try { return await shrinkForGemini(file); } catch (_) { /* send the original below */ } }
-  if (file.size > MAX_UPLOAD) throw new Error('That file is over 2 MB. Try a screenshot of the receipt instead.');
-  return file;
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')) throw new Error("PDFs can't be read. Open the receipt and upload a screenshot of it instead.");
+  if (!/^image\//.test(file.type) && !/\.(heic|heif)$/i.test(file.name || '')) throw new Error('Choose a screenshot of your receipt.');
+  try { return await shrinkReceipt(file); }
+  catch (_) { throw new Error("This browser can't open that photo. Upload a screenshot of the receipt instead."); }
 }
 
 // Tokens: total donated divided by the token price, rounded to the nearest whole token (so $29 is 1 and $31 is 2).
@@ -673,20 +676,21 @@ function Tokens({ me, price }) {
       <span>You have <b>${me.tokens}</b> token${me.tokens === 1 ? '' : 's'}</span>
       <span class="next">${me.donated === 0 ? `Donate $${price / 2} or more to earn your first.` : `${AUD2.format(me.donated)} donated. ${AUD2.format(toNext)} more earns the next one.`}</span>
       ${me.freeLeft && html`<span class="next">You also have 1 free run.</span>`}
+      ${(me.rankedLeft > 0 || me.ownLeft > 0) && html`<span class="next">Plus ${me.rankedLeft > 0 ? 'a ranked run' : 'an avatar run'} already paid for.</span>`}
     </p>`;
 }
 
-const STATUS = { ok: ['Added', 'ok'], pending: ['Joash is checking', 'wait'], rejected: ['Not accepted', 'no'] };
+const STATUS = { ok: ['Added', 'ok'], pending: ['In the queue', 'wait'], rejected: ['Not accepted', 'no'] };
 function resultText(r) {
   if (r.status === 'ok') return `Added ${AUD2.format(r.amount)}${r.name ? ' from ' + r.name.replace(/\.$/, '') : ''}. You now have ${r.tokens} token${r.tokens === 1 ? '' : 's'}.`;
-  if (r.status === 'pending') return r.reason || "Thanks! Joash needs to check this one by hand. Your tokens appear as soon as he approves it.";
+  if (r.status === 'pending') return "The receipt checker is busy, so your receipt is in the queue. It'll be checked automatically in the next few minutes and your tokens will show up here.";
   return r.reason || "This receipt wasn't accepted.";
 }
 
 function ReceiptUpload({ onUpload, receipts }) {
   const [state, setState] = useState({ phase: 'idle' });   // idle | checking | done | error
   const [over, setOver] = useState(false);
-  const [pv, setPv] = useState({ amount: '25', to: 'joash' });   // preview only: stands in for what Gemini reads
+  const [pv, setPv] = useState({ amount: '25', to: 'joash' });   // preview only: stands in for what the receipt checker reads
   const fileRef = useRef(null);
   const busy = state.phase === 'checking';
   const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -701,6 +705,14 @@ function ReceiptUpload({ onUpload, receipts }) {
     } catch (e) { setState({ phase: 'error', msg: e.message }); }
     if (fileRef.current) fileRef.current.value = '';
   };
+  // Once a queued receipt has been checked, say how it went instead of "in the queue"
+  let shown = state.phase === 'done' ? { status: state.result.status, text: resultText(state.result) } : null;
+  if (shown && shown.status === 'pending' && receipts[0] && receipts[0].status !== 'pending') {
+    const last = receipts[0];
+    shown = last.status === 'ok'
+      ? { status: 'ok', text: `Your receipt from the queue has been checked and ${AUD2.format(last.amount)} was added.` }
+      : { status: 'rejected', text: `Your receipt from the queue wasn't accepted. ${last.reason || ''}`.trim() };
+  }
   // Paste a screenshot anywhere on the page (Ctrl+V or Cmd+V)
   const handleRef = useRef(handle); handleRef.current = handle;
   useEffect(() => {
@@ -716,16 +728,16 @@ function ReceiptUpload({ onUpload, receipts }) {
         onDrop=${e => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files[0]); }}>
         <span class="drop-icon" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="drop-main">${busy ? 'Checking your receipt…' : touch ? 'Tap to add your receipt' : 'Add your receipt screenshot'}</span>
-        <span class="drop-sub">${busy ? 'This takes a few seconds.' : touch ? 'Pick the screenshot straight from your photos. PDFs work too.' : `Click to choose it, drag it here, or paste it with ${IS_MAC ? '⌘V' : 'Ctrl+V'}. PDFs work too.`}</span>
-        <input id="receipt-file" ref=${fileRef} type="file" accept="image/*,application/pdf" disabled=${busy} onChange=${e => handle(e.target.files[0])} />
+        <span class="drop-sub">${busy ? 'This takes a few seconds.' : touch ? 'Pick the screenshot straight from your photos.' : `Click to choose it, drag it here, or paste it with ${IS_MAC ? '⌘V' : 'Ctrl+V'}.`}</span>
+        <input id="receipt-file" ref=${fileRef} type="file" accept="image/*" disabled=${busy} onChange=${e => handle(e.target.files[0])} />
       </label>
-      ${state.phase === 'done' && html`<p class=${'result ' + state.result.status} role="status">${resultText(state.result)}</p>`}
+      ${state.phase === 'done' && html`<p class=${'result ' + shown.status} role="status">${shown.text}</p>`}
       ${state.phase === 'error' && html`<p class="err" role="alert">${state.msg}</p>`}
       ${PREVIEW && html`
         <p class="pvbar">
-          <span>Preview only: there's no Gemini here, so pretend the receipt is</span>
+          <span>Preview only: there's no receipt checker here, so pretend the receipt is</span>
           <select aria-label="Who the pretend donation went to" value=${pv.to} onChange=${e => setPv({ ...pv, to: e.target.value })}>
-            <option value="joash">for Joash</option><option value="other">for someone else</option><option value="blurry">too blurry to read</option>
+            <option value="joash">for Joash</option><option value="other">for someone else</option><option value="blurry">too blurry to read</option><option value="fake">fake</option><option value="busy">sent while the checker is busy</option>
           </select>
           <span>for $</span><input aria-label="Pretend amount" type="number" min="1" step="1" value=${pv.amount} onInput=${e => setPv({ ...pv, amount: e.target.value })} />
         </p>`}
@@ -791,8 +803,8 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
     <div class="shave" id="shave">
       <header class="shave-head">
         <p class="eyebrow"><span class="bits"><span class="px o"></span><span class="px t"></span><span class="px l"></span></span>World's Greatest Shave</p>
-        <h1 class="name">Shave my <em>pixel head.</em></h1>
-        <p class="lede">I'm shaving my head for World's Greatest Shave to raise money for people living with blood cancer. Donate, and every $${price} gets you a go at shaving the pixel version of me.</p>
+        <h1 class="name">How fast can you <em>shave my head?</em></h1>
+        <p class="lede">I'm shaving my head for World's Greatest Shave to raise money for people living with blood cancer. Donate, and every $${price} gets you a timed go at shaving the pixel version of me, plus a go at shaving your own avatar.</p>
         <div class="head-ctas">
           <a class="pbtn" href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a>
           <button type="button" class="textlink" onClick=${toGame}>Skip to the game ↓</button>
@@ -816,8 +828,9 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
         <ul class="points">
           <li><span>Screenshot the receipt email or the thank-you page. Make sure <strong>my name, the amount and the receipt number</strong> are in the shot.</span></li>
           <li><span>Add it below. On a phone, tap the box and pick the screenshot from your photos. On a computer, drag it in or paste it. There's nothing to type.</span></li>
-          <li><span>It's checked automatically to make sure the donation went to my page, then your tokens are added. Each receipt only counts once.</span></li>
-          <li><span>If a receipt can't be read, it comes to me and I'll check it by hand.</span></li>
+          <li><span>It's checked automatically in a few seconds to make sure it's a real receipt for a donation to my page, then your tokens are added. Each receipt only counts once.</span></li>
+          <li><span>If the checker is busy, your receipt waits in a queue and is checked automatically a few minutes later. You don't need to do anything.</span></li>
+          <li><span>If it isn't accepted, you'll see why straight away. Usually a clearer screenshot of the whole receipt fixes it.</span></li>
         </ul>
         <${Tokens} me=${me} price=${price} />
         <${ReceiptUpload} receipts=${me.receipts} onUpload=${actions.upload} />
@@ -839,12 +852,12 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
       <section class="step" id="step-shave" aria-labelledby="step-4">
         <h2 class="step-h" id="step-4"><span class="step-n">04</span>Shave my head</h2>
         <ul class="points">
-          <li><span>Press <strong>Ranked run</strong> to spend one token and shave pixel me. Your time can go on the leaderboard.</span></li>
+          <li><span>Each token gets you <strong>two runs</strong>: a ranked run on pixel me, whose time can go on the leaderboard, and a run shaving your own avatar.</span></li>
           <li><span>Hold and drag to run the clippers. On a phone, press and drag with your finger.</span></li>
           <li><span>The clock starts at your first cut and stops when 95% of the hair is gone.</span></li>
           <li><span>Everyone gets <strong>one free run</strong>, either a practice on me or shaving your own avatar. Free runs don't go on the board.</span></li>
         </ul>
-        <${ShaveGame} tokens=${me.tokens} freeLeft=${me.freeLeft} look=${me.look} playerName=${me.name} savedBest=${me.best}
+        <${ShaveGame} tokens=${me.tokens} freeLeft=${me.freeLeft} rankedLeft=${me.rankedLeft} ownLeft=${me.ownLeft} look=${me.look} playerName=${me.name} savedBest=${me.best}
           onStart=${actions.start} onWin=${actions.finish} />
       </section>
 
@@ -863,7 +876,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
 // Joash's World's Greatest Shave page. Every donate link on the site uses it.
 const FUNDRAISER = { url: 'https://www.worldsgreatestshave.com/fundraisers/joashj' };
 const START_LOOK = { skin: 2, hair: 1, style: 5, eyes: 2, face: 1, shirt: 1, extra: 0 };
-const EMPTY_ME = { name: '', look: START_LOOK, donated: 0, tokens: 0, freeLeft: true, best: null, receipts: [] };
+const EMPTY_ME = { name: '', look: START_LOOK, donated: 0, tokens: 0, freeLeft: true, rankedLeft: 0, ownLeft: 0, best: null, receipts: [] };
 
 // No sign-up: each browser gets a random ID the first time, and the Worker saves everything under it.
 function playerId() {
@@ -908,11 +921,11 @@ const SAMPLE_TIMES = [['Tom W.', 38.42], ['Ana L.', 44.07], ['Priya S.', 51.9], 
 
 function LocalAPI() {
   const price = 20;
-  const p = { name: '', look: START_LOOK, cents: 0, spent: 0, freeUsed: false, bestMs: null, receipts: [], runs: {} };
+  const p = { name: '', look: START_LOOK, cents: 0, spent: 0, freeUsed: false, rankedLeft: 0, ownLeft: 0, bestMs: null, receipts: [], runs: {} };
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   const view = () => {
     const tokens = Math.max(0, tokensFor(p.cents / 100, price) - p.spent);
-    const me = { name: p.name, look: p.look, donated: p.cents / 100, tokens, freeLeft: !p.freeUsed, best: p.bestMs == null ? null : p.bestMs / 1000, receipts: p.receipts.slice().reverse() };
+    const me = { name: p.name, look: p.look, donated: p.cents / 100, tokens, freeLeft: !p.freeUsed, rankedLeft: p.rankedLeft, ownLeft: p.ownLeft, best: p.bestMs == null ? null : p.bestMs / 1000, receipts: p.receipts.slice().reverse() };
     const you = { name: p.name || 'You', look: p.look, me: true };
     const donors = [...SAMPLE_DONORS, ...(p.cents > 0 ? [{ ...you, amount: p.cents / 100 }] : [])].sort((a, b) => b.amount - a.amount).slice(0, 10);
     const shavers = [...SAMPLE_TIMES, ...(p.bestMs != null ? [{ ...you, secs: p.bestMs / 1000 }] : [])].sort((a, b) => a.secs - b.secs).slice(0, 10);
@@ -925,7 +938,17 @@ function LocalAPI() {
       const amount = Math.round(parseFloat(pv.amount) * 100) / 100;
       let result;
       if (pv.to === 'other') result = { status: 'rejected', reason: "This receipt is for a different fundraiser. Only donations to Joash's page count." };
-      else if (pv.to === 'blurry' || !(amount > 0)) result = { status: 'pending' };
+      else if (pv.to === 'fake') result = { status: 'rejected', reason: "This doesn't look like a genuine World's Greatest Shave receipt, so it can't be counted." };
+      else if (pv.to === 'busy' && amount > 0) {
+        // Stands in for the queue: "checked" a few seconds later
+        result = { status: 'pending' };
+        const entry = { amount: null, status: 'pending', reason: null, when: Date.now() };
+        setTimeout(() => { entry.status = 'ok'; entry.amount = amount; p.cents += Math.round(amount * 100); if (!p.name) p.name = 'Sam L.'; }, 6000);
+        p.receipts.push(entry);
+        const v = view();
+        return { ...v, result: { ...result, tokens: v.me.tokens } };
+      }
+      else if (pv.to === 'blurry' || !(amount > 0)) result = { status: 'rejected', reason: "We couldn't read that screenshot. Try a clear, uncropped one that shows Joash's name, the amount and the receipt number." };
       else {
         p.cents += Math.round(amount * 100);
         if (!p.name) p.name = 'Sam L.';
@@ -938,7 +961,9 @@ function LocalAPI() {
     profile: async ({ look, name }) => { if (look) p.look = look; if (name) p.name = name.slice(0, 24); return view(); },
     start: async (mode) => {
       const tokens = view().me.tokens;
-      if (mode === 'ranked' || (mode === 'own' && p.freeUsed)) { if (tokens < 1) throw new Error('You need a token for that. Upload a receipt to earn one.'); p.spent++; }
+      const spend = (other) => { if (tokens < 1) throw new Error('You need a token for that. Upload a receipt to earn one.'); p.spent++; p[other]++; };
+      if (mode === 'ranked') { if (p.rankedLeft > 0) p.rankedLeft--; else spend('ownLeft'); }
+      else if (mode === 'own' && p.freeUsed) { if (p.ownLeft > 0) p.ownLeft--; else spend('rankedLeft'); }
       else if (p.freeUsed) throw new Error("You've already used your free practice.");
       else p.freeUsed = true;
       const runId = String(Math.random()).slice(2);
@@ -968,11 +993,17 @@ function DonateTile({ price }) {
     const full = () => { for (let i = 0; i < N * N; i++) hp[i] = head.kind[i] === HAIR ? head.max[i] : 0; };
     full();
     const img = ctx.createImageData(N, N);
-    // an automatic pass: left-right rows over the hair
-    let minY = N, maxY = 0;
-    for (let i = 0; i < N * N; i++) if (head.kind[i] === HAIR) { const y = (i / N) | 0; minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+    // the full head, faded back in over the shaved one when the hair grows back
+    const grown = document.createElement('canvas'); grown.width = grown.height = N;
+    { const g = grown.getContext('2d'), gi = g.createImageData(N, N); paintHead(gi, hp, head); g.putImageData(gi, 0, 0); }
+    // an automatic pass: left-right rows that stay over the hair in each band
     const path = [];
-    for (let y = minY, dir = 1; y <= maxY + 1; y += 2, dir = -dir) path.push(dir > 0 ? [12, y] : [52, y], dir > 0 ? [52, y] : [12, y]);
+    for (let y = 0, dir = 1; y < N + 2; y += 2) {
+      let x0 = N, x1 = -1;
+      for (let yy = y - 2; yy <= y; yy++) for (let x = 0; x < N; x++) if (yy >= 0 && yy < N && head.kind[yy * N + x] === HAIR) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
+      if (x1 < 0) continue;
+      path.push(dir > 0 ? [x0, y] : [x1 + 1, y], dir > 0 ? [x1 + 1, y] : [x0, y]); dir = -dir;
+    }
     let seg = 0, t = 0, mode = 'auto', idle = 0, regrow = 0, user = null, raf, last = performance.now();
     const still = reduceMotion();
     const cut = (px, py, amt) => {
@@ -999,18 +1030,18 @@ function DonateTile({ price }) {
         const [ax, ay] = path[seg], [bx, by] = path[Math.min(seg + 1, path.length - 1)];
         const len = Math.hypot(bx - ax, by - ay) || 1;
         t += dt * 46 / len;
-        if (t >= 1) { t = 0; seg++; }
+        if (t >= 1) { t -= 1; seg++; }
         if (seg >= path.length - 1) { mode = 'pause'; idle = 0; }
-        else { clip = [ax + (bx - ax) * t, ay + (by - ay) * t]; cut(clip[0], clip[1], 40 * dt); }
+        else { clip = [ax + (bx - ax) * t, ay + (by - ay) * t]; cut(clip[0], clip[1], 90 * dt); }
       } else if (mode === 'pause') {
         idle += dt; if (idle > 1.4) { mode = 'regrow'; regrow = 0; }
       } else if (mode === 'regrow') {
         regrow += dt;
-        for (let i = 0; i < N * N; i++) if (head.kind[i] === HAIR && hp[i] < head.max[i]) hp[i] = Math.min(head.max[i], hp[i] + dt * 2.4);
-        if (regrow > 1.6) { full(); mode = 'auto'; seg = 0; t = 0; }
+        if (regrow > 1) { full(); mode = 'auto'; seg = 0; t = 0; }
       }
       paintHead(img, hp, head);
       ctx.putImageData(img, 0, 0);
+      if (mode === 'regrow') { ctx.globalAlpha = Math.min(1, regrow); ctx.drawImage(grown, 0, 0); ctx.globalAlpha = 1; }
       if (clip) {
         const bx = Math.floor(clip[0] - 2), by = Math.floor(clip[1] - 1.5);
         ctx.fillStyle = '#14161F'; ctx.fillRect(bx, by + 3, 4, 6);
@@ -1070,9 +1101,35 @@ function Home({ boards, config }) {
     </div>`;
 }
 
-// Two pages: home and the shave game. The live site serves them as / and /shave; the preview uses #shave.
+// Privacy policy (/privacy). Keep it in step with what src/worker.js actually stores.
+function Privacy() {
+  const sec = (title, ...body) => html`<section class="policy-sec"><h2 class="policy-h">${title}</h2>${body}</section>`;
+  return html`
+    <div class="simple policy">
+      <div>
+        <p class="eyebrow">Last updated 26 October 2026</p>
+        <h1 class="name">Privacy</h1>
+      </div>
+      <p class="lede">This site raises money for Joash Jobson's World's Greatest Shave. It keeps as little about you as it can. Here's exactly what that is.</p>
+      ${sec('No accounts, no tracking',
+        html`<p>There's no sign-up, no ads and no analytics. The first time you visit, your browser makes a random ID (a string of letters and numbers) and keeps it on your device. That's how the site remembers your tokens and times. Your browser also remembers whether you picked the light or dark theme. Neither is a cookie, and clearing your browser's site data removes both.</p>`)}
+      ${sec('Receipts',
+        html`<p>When you upload a receipt, the screenshot is sent to <a class="textlink" href="https://groq.com" target="_blank" rel="noopener">Groq</a>, an AI service, which reads who the donation went to, the amount, the receipt number, the date and the donor's name. Groq doesn't use it to train AI. Groq may keep a temporary log for up to 30 days to investigate abuse, unless that's turned off in its settings.</p>`,
+        html`<p>The screenshot itself isn't kept. If the checker is busy, it waits in a queue and is deleted as soon as it's been checked. The site keeps what was read from it: the amount, receipt number, donor name, who it went to and whether it was accepted, so a receipt can't be counted twice.</p>`)}
+      ${sec('The leaderboard',
+        html`<p>Your leaderboard name is the one you choose, or your first name and last initial from your receipt (like "Sam L."). Full names are never shown publicly. The leaderboards show that name, your avatar, your total donated and your best shave time.</p>`)}
+      ${sec('Who sees what',
+        html`<p>Everyone can see the leaderboards. Joash can see the details read from each receipt on his admin page, and gets an email with the name, amount and receipt number when a donation is added. Nobody else gets your information, and it's never sold.</p>`)}
+      ${sec('Where it\'s kept',
+        html`<p>Everything is stored with Cloudflare, which runs the site. To stop floods of uploads, your IP address is turned into a code that can't be reversed and kept for a day. Cloudflare's own logs of visits are kept for a few days. Fonts are loaded from Google Fonts, so Google sees your IP address when the page loads. Emails to Joash are sent with Resend.</p>`)}
+      ${sec('Removing your information',
+        html`<p>Ask Joash and he'll delete everything the site holds about you: your name, avatar, times and receipt details. Any tokens you had go with it.</p>`)}
+    </div>`;
+}
+
+// Three pages: home, the shave game and privacy. The live site serves them as /, /shave and /privacy; the preview uses #hashes.
 function useRoute() {
-  const get = () => PREVIEW ? (location.hash === '#shave' ? 'shave' : 'home') : (document.body.dataset.page || 'home');
+  const get = () => PREVIEW ? ({ '#shave': 'shave', '#privacy': 'privacy' }[location.hash] || 'home') : (document.body.dataset.page || 'home');
   const [route, setRoute] = useState(get);
   useEffect(() => {
     if (!PREVIEW) return;
@@ -1097,6 +1154,13 @@ function App() {
     return d;
   }, []);
   useEffect(() => { api.load().then(apply, () => setOffline(true)); }, []);
+  // While a receipt waits in the queue, check back every minute so its tokens show up without a refresh
+  const queued = me.receipts.some(r => r.status === 'pending');
+  useEffect(() => {
+    if (!queued) return;
+    const t = setInterval(() => api.load().then(apply, () => {}), PREVIEW ? 3000 : 60000);
+    return () => clearInterval(t);
+  }, [queued]);
 
   // Avatar changes show straight away and save half a second after the last click.
   const lookTimer = useRef(null);
@@ -1124,9 +1188,11 @@ function App() {
     </header>
     ${offline && html`<p class="offline" role="status">The leaderboard couldn't load just now. Refresh the page to try again.</p>`}
     <main>
-      ${route === 'home' ? html`<${Home} boards=${boards} config=${config} />` : html`<${WgsFundraiserSection} me=${me} boards=${boards} config=${config} actions=${actions} />`}
+      ${route === 'home' ? html`<${Home} boards=${boards} config=${config} />`
+        : route === 'privacy' ? html`<${Privacy} />`
+        : html`<${WgsFundraiserSection} me=${me} boards=${boards} config=${config} actions=${actions} />`}
     </main>
-    <footer><div class="wrap"><span>© 2026 Joash Jobson</span><a href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a></div></footer>`;
+    <footer><div class="wrap"><span>© 2026 Joash Jobson</span><span class="foot-links"><a href=${PAGES.privacy}>Privacy</a><a href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a></span></div></footer>`;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);

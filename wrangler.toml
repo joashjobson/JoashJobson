@@ -5,7 +5,7 @@
 # KEEP THESE THE SAME IN EVERY VERSION: `name`, the [[durable_objects.bindings]] block and the [[migrations]] block.
 # The leaderboard, donations and receipts are saved under them. Changing one starts a new, empty database.
 # The name below must also match the Worker's name in the Cloudflare dashboard exactly.
-name = "joash-site"
+name = "joashjobson"
 main = "src/worker.js"
 compatibility_date = "2026-09-01"
 
@@ -25,8 +25,17 @@ class_name = "Store"
 tag = "v1"
 new_sqlite_classes = ["Store"]
 
-[observability]
+# Matches the Logs settings in the Cloudflare dashboard, so the two stay in sync
+[observability.logs]
 enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
 
 [vars]
 # Joash's World's Greatest Shave page. Receipts only count if they show a donation to this person and page.

@@ -4,7 +4,7 @@ const html = htm.bind(React.createElement);
 // The artifact preview sets JJ_PREVIEW: it routes with #hash and keeps everything in memory.
 // The live site has real pages (/ and /shave) and saves to the Worker at /api.
 const PREVIEW = !!window.JJ_PREVIEW;
-const PAGES = PREVIEW ? { home: '#home', shave: '#shave', messages: '#messages', privacy: '#privacy' } : { home: '/', shave: '/shave', messages: '/messages', privacy: '/privacy' };
+const PAGES = PREVIEW ? { home: '#home', shave: '#shave', messages: '#messages', privacy: '#privacy', terms: '#terms' } : { home: '/', shave: '/shave', messages: '/messages', privacy: '/privacy', terms: '/terms' };
 
 /* ---------- Pixel portraits: 64x64, shaded with hue-shifted colour ramps, built from preset parts ---------- */
 const ART = 64;
@@ -802,6 +802,7 @@ function Messages({ api, me, onPosted }) {
             <span class="count">${text.length}/280 · Your avatar from the shave game goes with it</span>
             <button class="pbtn" type="submit" id="msg-post" disabled=${busy || !text.trim() || !name.trim()}>${busy ? 'Checking…' : 'Post'}</button>
           </div>
+          <p class="terms-note">Messages are public. By posting, you agree to the <a class="textlink" href=${PAGES.terms}>terms</a> and take responsibility for what you write.</p>
           ${err && html`<p class="err" role="alert">${err}</p>`}
           ${earned > 0 && html`<p class="result ok" role="status">Posted! You earned ${earned} goes at the shave game. <a class="textlink" href=${PAGES.shave + (PREVIEW ? '' : '#step-shave')}>Play now</a></p>`}
         </div>
@@ -1377,7 +1378,7 @@ function Privacy() {
       ${sec('The leaderboard',
         html`<p>The leaderboard shows the name you choose, your avatar and your best shave time. Use a first name or a nickname if you'd rather not show your full name.</p>`)}
       ${sec('Messages',
-        html`<p>Messages are public. A message shows the name you type, your avatar and any "In honour of" or "In memory of" name you add, so only add someone's name if you're happy for it to be seen. Before a message goes up, its words are sent to <a class="textlink" href="https://groq.com" target="_blank" rel="noopener">Groq</a>, an AI service, to check they're friendly. Groq doesn't use them to train AI. Joash can take any post down, and he may share messages in a video on social media, like LinkedIn.</p>`)}
+        html`<p>Messages are public. A message shows the name you type, your avatar and any "In honour of" or "In memory of" name you add, so only add someone's name if you're happy for it to be seen. Before a message goes up, its words are sent to <a class="textlink" href="https://groq.com" target="_blank" rel="noopener">Groq</a>, an AI service, to check they're friendly. Groq doesn't use them to train AI. Joash can take any post down, and he may share messages in a video on social media, like LinkedIn. What you can and can't post is in the <a class="textlink" href=${PAGES.terms}>terms</a>.</p>`)}
       ${sec('Who sees what',
         html`<p>Everyone can see the leaderboard and the messages. Joash can see the same names, times and messages on his admin page. Nobody else gets your information, and it's never sold.</p>`)}
       ${sec('Where it\'s kept',
@@ -1387,10 +1388,48 @@ function Privacy() {
     </div>`;
 }
 
-// Four pages: home, the shave game, messages and privacy. The live site serves them as /, /shave, /messages and /privacy; the preview uses #hashes.
+// Terms of use (/terms). Plain English, in step with how the game, goes and messages actually work.
+function Terms() {
+  const sec = (title, ...body) => html`<section class="policy-sec"><h2 class="policy-h">${title}</h2>${body}</section>`;
+  return html`
+    <div class="simple policy">
+      <div>
+        <p class="eyebrow">Last updated 28 October 2026</p>
+        <h1 class="name">Terms of use</h1>
+      </div>
+      <p class="lede">By using this site, playing the shave game or posting a message, you agree to these terms. They're short, so please read them.</p>
+      ${sec('Whose site this is',
+        html`<p>This is Joash Jobson's personal website. The shave game and messages wall support his World's Greatest Shave fundraiser for the Leukaemia Foundation. The site is run by Joash, not by World's Greatest Shave or the Leukaemia Foundation.</p>`)}
+      ${sec('The game is free',
+        html`<p>You never have to donate to play. Everyone gets 2 free goes, and each message of support that goes up earns 2 more, for up to 2 messages a day. Goes have no money value and can't be bought, sold or swapped. The leaderboard is just for fun, and there are no prizes.</p>
+          <p>Play fair. Joash can remove times that look like cheating (for example bots or tampering with the site), and he can change how the game or goes work at any time.</p>`)}
+      ${sec('Donating',
+        html`<p>Donations are made on <a class="textlink" href=${FUNDRAISER.url} target="_blank" rel="noopener">World's Greatest Shave's own website</a> and follow their terms. This site never handles money, and donating is always your choice.</p>`)}
+      ${sec("You're responsible for what you post",
+        html`<p>Your messages, your leaderboard name and any "In honour of" or "In memory of" name are public. You are responsible for everything you post. Don't post anything that is:</p>
+          <ul class="policy-list">
+            <li>rude, hateful, bullying, threatening or sexual</li>
+            <li>false, or pretending to be someone else</li>
+            <li>someone's private information, like a phone number or address</li>
+            <li>asking for money or sending people to another fundraiser, PayID or link</li>
+            <li>spam, ads or anything illegal</li>
+          </ul>
+          <p>Only add someone's name in a dedication if you're sure they (or their family) would be happy to see it. An AI check looks at messages before they go up, but it can miss things. That doesn't make what you post Joash's responsibility.</p>`)}
+      ${sec('Taking things down',
+        html`<p>Joash can remove any message, name or time, or stop someone posting, at any time and without giving a reason. If you see something that shouldn't be here, tell Joash and he'll look at it.</p>`)}
+      ${sec('Sharing your message',
+        html`<p>When you post a message, you let Joash show it on this site and share it in videos or posts about his fundraiser, like on LinkedIn, with the name you typed. You can ask him to remove it at any time, and he'll stop using it in anything new.</p>`)}
+      ${sec('No guarantees',
+        html`<p>The site is a personal project, provided as it is. It may change, have bugs or go offline, and scores or messages could be lost. As far as the law allows, Joash isn't responsible for any loss from using the site. Nothing here takes away rights you have under Australian Consumer Law.</p>`)}
+      ${sec('Privacy and changes',
+        html`<p>How your information is handled is on the <a class="textlink" href=${PAGES.privacy}>Privacy</a> page. These terms may be updated, and the date at the top will change when they are. Questions? Ask Joash.</p>`)}
+    </div>`;
+}
+
+// Five pages: home, the shave game, messages, privacy and terms. The live site serves them as /, /shave, /messages, /privacy and /terms; the preview uses #hashes.
 function useRoute() {
   // The messages video maker lives at /messages#video (Joash opens it from the admin page)
-  const get = () => PREVIEW ? ({ '#shave': 'shave', '#privacy': 'privacy', '#messages': 'messages', '#video': 'video' }[location.hash] || 'home')
+  const get = () => PREVIEW ? ({ '#shave': 'shave', '#privacy': 'privacy', '#terms': 'terms', '#messages': 'messages', '#video': 'video' }[location.hash] || 'home')
     : document.body.dataset.page === 'messages' && location.hash === '#video' ? 'video' : (document.body.dataset.page || 'home');
   const [route, setRoute] = useState(get);
   useEffect(() => {
@@ -1447,11 +1486,12 @@ function App() {
     <main>
       ${route === 'home' ? html`<${Home} boards=${boards} config=${config} />`
         : route === 'privacy' ? html`<${Privacy} />`
+        : route === 'terms' ? html`<${Terms} />`
         : route === 'messages' ? html`<${Messages} api=${api} me=${me} onPosted=${apply} />`
         : route === 'video' ? html`<${MessageVideo} api=${api} config=${config} />`
         : html`<${WgsFundraiserSection} me=${me} boards=${boards} config=${config} actions=${actions} />`}
     </main>
-    <footer><div class="wrap"><span>© 2026 Joash Jobson</span><span class="foot-links"><a href=${PAGES.privacy}>Privacy</a><a href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a></span></div></footer>`;
+    <footer><div class="wrap"><span>© 2026 Joash Jobson</span><span class="foot-links"><a href=${PAGES.privacy}>Privacy</a><a href=${PAGES.terms}>Terms</a><a href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a></span></div></footer>`;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);

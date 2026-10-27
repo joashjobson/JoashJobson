@@ -566,3 +566,5 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
 .overlay p.soft-ask a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .arcade .overlay p.soft-ask a { color: var(--accent2); }
 .overlay p.dare { color: var(--ink); font-weight: 600; }
+.policy-list { margin: 0 0 12px; padding-left: 20px; line-height: 1.6; }
+.terms-note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }

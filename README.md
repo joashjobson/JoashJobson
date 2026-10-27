@@ -1,6 +1,6 @@
 # Joash Jobson's website
 
-Joash's home page (`/`), the World's Greatest Shave pixel-shaving game (`/shave`), the messages wall (`/messages`), the privacy policy (`/privacy`) and his admin page (`/admin`), running on a Cloudflare Worker.
+Joash's home page (`/`), the World's Greatest Shave pixel-shaving game (`/shave`), the messages wall (`/messages`), the privacy policy (`/privacy`), the terms of use (`/terms`) and his admin page (`/admin`), running on a Cloudflare Worker.
 
 - `dist/` is the website: pages, styles, code and images. Nothing needs building.
 - `src/worker.js` answers `/api/...`: it saves the leaderboard and messages, checks messages with Groq, and adds the link preview picture to `/shave`.

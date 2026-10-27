@@ -1,6 +1,6 @@
 # Joash Jobson's website
 
-Joash's home page (`/`), the World's Greatest Shave pixel-shaving game (`/shave`), the privacy policy (`/privacy`) and his admin page (`/admin`), running on a Cloudflare Worker.
+Joash's home page (`/`), the World's Greatest Shave pixel-shaving game (`/shave`), the messages wall (`/messages`), the privacy policy (`/privacy`) and his admin page (`/admin`), running on a Cloudflare Worker.
 
 - `dist/` is the website: pages, styles, code and images. Nothing needs building.
 - `src/worker.js` answers `/api/...`: it checks receipts with Groq, counts tokens, saves the leaderboard, and can email when a donation is added.
@@ -21,6 +21,12 @@ Groq checks each receipt and the site decides straight away: added, or turned do
 Receipts must be screenshots (JPG, PNG or WebP). Groq can't read PDFs, so the upload box asks for a screenshot instead.
 
 Groq doesn't use what it's sent for training. For the strictest setting, turn on Zero Data Retention in the Groq console under Settings, Data Controls, so receipts are never logged at Groq either.
+
+## The top spot and messages
+
+The banner at the top of the home page is "the top spot". Anyone who uploads a receipt for one donation of at least `TOP_SPOT_MIN_AUD` (first holder) or `TOP_SPOT_STEP_AUD` more than the donation showing can take it, as a person or a business (name, message, website and logo). Change those two settings in `wrangler.toml` under `[vars]`.
+
+Anyone can post on `/messages`, no donation needed. Messages and top spot posts are checked by Groq before they go up (the same `GROQ_API_KEY`). To take one down, use the Posts tab on the admin page. "Make messages video" on the admin page turns the wall into an MP4 for LinkedIn (use Chrome or Safari on a computer).
 
 ## Saved data
 

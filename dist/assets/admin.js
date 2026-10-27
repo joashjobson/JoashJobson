@@ -92,12 +92,33 @@
         ' ', el('button', { class: 'textlink', type: 'button', onclick: () => confirm("Delete everything about this person? Their name, avatar, times, tokens and receipt details go for good. This can't be undone.") && toggle({ remove: true }, 'Deleted.') }, 'Delete')));
   }
 
+  // Top spot posts and messages: both go up automatically once the checker passes them; Joash can take any down
+  function postRow(type, p) {
+    const removed = p.status === 'removed';
+    const toggle = async () => { try { await post('post', { type, id: p.id, remove: !removed }); say(removed ? 'Put back up.' : 'Taken down.'); load(); } catch (e) { say(e.message, true); } };
+    const what = type === 'spot'
+      ? [el('b', {}, p.name), p.kind === 'business' ? ' (business)' : '', ' · ' + AUD.format(p.amount), p.site ? ' · ' + p.site : '', el('br'), p.message]
+      : [el('b', {}, p.name), p.ded_kind ? ` · ${p.ded_kind === 'memory' ? 'In memory of' : 'In honour of'} ${p.ded_name}` : '', el('br'), p.text];
+    return el('tr', { class: removed ? 'hidden' : '' },
+      el('td', {}, type === 'spot' && p.logo && !removed ? el('img', { src: p.logo, alt: '', width: 32, height: 32, class: 'adm-logo' }) : null),
+      el('td', {}, what), el('td', {}, when(type === 'spot' ? p.when : p.created)), el('td', {}, removed ? 'Taken down' : 'Live'),
+      el('td', {}, el('button', { class: 'textlink', type: 'button', onclick: () => (removed || confirm('Take this down? It disappears from the site straight away.')) && toggle() }, removed ? 'Put back' : 'Take down')));
+  }
+  const postTable = (type, rows, none) => rows.length
+    ? el('table', { class: 'adm-table' }, el('thead', {}, el('tr', {}, ['', type === 'spot' ? 'Top spot' : 'Message', 'Posted', 'Status', ''].map(h => el('th', {}, h)))), el('tbody', {}, rows.map(r => postRow(type, r))))
+    : el('p', { class: 'empty' }, none);
+
   async function load() {
     const list = $('#list');
     document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     list.replaceChildren(el('p', { class: 'empty' }, 'Loading…'));
     try {
-      if (tab === 'players') {
+      $('#queue').textContent = '';
+      if (tab === 'posts') {
+        const d = await (await api('posts')).json();
+        list.replaceChildren(el('h2', { class: 'label' }, 'The top spot'), postTable('spot', d.spots, 'Nobody has taken the top spot yet.'),
+          el('h2', { class: 'label' }, 'Messages'), postTable('message', d.messages, 'No messages yet.'));
+      } else if (tab === 'players') {
         const people = await (await api('players')).json();
         list.replaceChildren(people.length
           ? el('table', { class: 'adm-table' }, el('thead', {}, el('tr', {}, ['Name', 'Donated', 'Best', 'Tokens left', ''].map(h => el('th', {}, h)))), el('tbody', {}, people.map(playerRow)))

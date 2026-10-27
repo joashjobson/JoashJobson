@@ -4,7 +4,7 @@ const html = htm.bind(React.createElement);
 // The artifact preview sets JJ_PREVIEW: it routes with #hash and keeps everything in memory.
 // The live site has real pages (/ and /shave) and saves to the Worker at /api.
 const PREVIEW = !!window.JJ_PREVIEW;
-const PAGES = PREVIEW ? { home: '#home', shave: '#shave', privacy: '#privacy' } : { home: '/', shave: '/shave', privacy: '/privacy' };
+const PAGES = PREVIEW ? { home: '#home', shave: '#shave', messages: '#messages', privacy: '#privacy' } : { home: '/', shave: '/shave', messages: '/messages', privacy: '/privacy' };
 
 /* ---------- Pixel portraits: 64x64, shaded with hue-shifted colour ramps, built from preset parts ---------- */
 const ART = 64;
@@ -380,6 +380,60 @@ function paintHead(img, hp, head = HEAD) {
 }
 
 function fmtTime(s) { return s == null ? '0.00' : s.toFixed(2); }
+
+/* ---------- Share card: a story-sized picture of your run, for Instagram and other socials. It always points at Joash's fundraiser. ---------- */
+const siteHost = () => PREVIEW ? 'joashjobson.workers.dev' : location.host;
+async function makeShareCard({ secs, mode, hp, look }) {
+  await Promise.all(['800 100px Archivo', '600 40px "Schibsted Grotesk"', '400 26px Silkscreen'].map(f => document.fonts.load(f).catch(() => {})));
+  const W = 1080, H = 1920, pad = 88, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  const own = mode === 'own';
+  const label = (t, x, y, col) => { ctx.font = '400 30px Silkscreen'; ctx.fillStyle = col; ctx.textBaseline = 'alphabetic'; ctx.fillText(t.toUpperCase(), x, y); };
+  ctx.fillStyle = '#F3F3EF'; ctx.fillRect(0, 0, W, H);
+  label("World's Greatest Shave", pad, pad + 40, '#5B5F68');
+  ctx.textAlign = 'right'; label(mode === 'ranked' ? 'Ranked run' : own ? 'Just for fun' : 'Practice run', W - pad, pad + 40, '#0A35A0'); ctx.textAlign = 'left';
+  ctx.textBaseline = 'top'; ctx.fillStyle = '#0E1014'; ctx.font = '800 92px Archivo';
+  ctx.fillText('I shaved', pad, 230);
+  ctx.fillText(own ? 'my own pixel' : "Joash's pixel", pad, 330);
+  ctx.fillText('head in', pad, 430);
+  // The time on a chartreuse block
+  ctx.font = '800 230px Archivo';
+  const t = fmtTime(secs) + 's', tw = ctx.measureText(t).width;
+  ctx.fillStyle = '#C8F03C'; ctx.fillRect(pad - 20, 560, tw + 40, 250);
+  ctx.fillStyle = '#0E1014'; ctx.fillText(t, pad, 572);
+  // Before and after
+  const before = document.createElement('canvas'); before.width = before.height = ART; paintArt(before.getContext('2d'), own ? look : JOASH);
+  const after = document.createElement('canvas'); after.width = after.height = N;
+  const ai = after.getContext('2d').createImageData(N, N); paintHead(ai, hp); after.getContext('2d').putImageData(ai, 0, 0);
+  const size = 420, gap = (W - pad * 2 - size * 2), y = 900;
+  [[before, 'Before', pad], [after, 'After', pad + size + gap]].forEach(([img, l, x]) => {
+    ctx.fillStyle = '#E8E8E2'; ctx.fillRect(x, y, size, size); ctx.drawImage(img, x, y, size, size);
+    label(l, x, y + size + 48, '#5B5F68');
+  });
+  // Bottom: where to play and where to give
+  ctx.fillStyle = '#0A35A0'; ctx.fillRect(0, 1470, W, H - 1470);
+  ctx.textBaseline = 'top'; ctx.fillStyle = '#FFFFFF'; ctx.font = '800 76px Archivo'; ctx.fillText('Beat my time.', pad, 1530);
+  ctx.fillStyle = '#C8F03C'; ctx.font = '600 44px "Schibsted Grotesk"'; ctx.fillText(siteHost() + '/shave', pad, 1630);
+  ctx.fillStyle = '#FFFFFF'; ctx.font = '500 32px "Schibsted Grotesk"';
+  ctx.fillText('Raising money for people living with blood cancer.', pad, 1730);
+  ctx.fillText('Donate: worldsgreatestshave.com/fundraisers/joashj', pad, 1778);
+  return c;
+}
+async function shareRun(run) {
+  const c = await makeShareCard(run);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  const file = new File([blob], 'my-shave-time.png', { type: 'image/png' });
+  const text = `I shaved ${run.mode === 'own' ? 'my own' : "Joash's"} pixel head in ${fmtTime(run.secs)}s for World's Greatest Shave. Beat my time: https://${siteHost()}/shave`;
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], text }); return 'shared'; }
+    catch (e) { if (e.name === 'AbortError') return 'cancelled'; }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = file.name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  try { await navigator.clipboard.writeText(text); } catch (_) { /* no clipboard */ }
+  return 'downloaded';
+}
 const AUD = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 });
 const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -432,6 +486,7 @@ function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onW
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [shareNote, setShareNote] = useState('');
 
   if (!G.current) {
     const hp = new Float32Array(N * N);
@@ -637,8 +692,10 @@ function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onW
             ${mode === 'practice' && html`<p>Practice runs don't go on the board.</p>`}
             ${mode === 'own' && html`<p>Just for fun. Avatar runs don't go on the board, because every hairstyle has a different amount of hair.</p>`}
             <div class="btns">
-              <button class="btn ghost" onClick=${quit}>Play again</button>
+              <button class="btn hot" id="share-run" onClick=${async () => { setShareNote('Making your picture…'); const r = await shareRun({ secs: result.secs, mode, hp: G.current.hp, look }).catch(() => 'failed'); setShareNote(r === 'downloaded' ? 'Saved the picture, and copied a caption with the link. Post it to your story!' : r === 'failed' ? "That didn't work. Try again." : ''); }}>Share my time</button>
+              <button class="btn ghost" onClick=${() => { setShareNote(''); quit(); }}>Play again</button>
             </div>
+            ${shareNote && html`<p role="status">${shareNote}</p>`}
           </div></div>`}
       </div>
       <div class="gamebar">
@@ -804,6 +861,381 @@ function MiniBoard({ id, title, rows, val, none, sample }) {
     </section>`;
 }
 
+/* ---------- The top spot: a banner anyone can take by outbidding the donation showing ---------- */
+const siteName = (link) => (link || '').replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+function TopSpot({ spot, sample, draft, cta = true }) {
+  const s = draft || (spot && spot.current);
+  const needed = spot ? spot.needed : 20;
+  return html`
+    <section class=${'topspot' + (s && s.kind === 'business' ? ' biz' : '') + (draft ? ' draft' : '')} aria-label="The top spot">
+      <div class="ts-head">
+        <span class="label">The top spot</span>
+        ${s && s.kind === 'business' && html`<span class="chip">Sponsored</span>`}
+        ${sample && !draft && html`<span class="chip">Sample</span>`}
+      </div>
+      ${s ? html`
+        <div class="ts-body">
+          ${s.logo && html`<img class="ts-logo" src=${s.logo} alt=${s.name + ' logo'} width="56" height="56" />`}
+          <div class="ts-text">
+            <p class="ts-msg">${s.message || 'Your message goes here.'}</p>
+            <p class="ts-by"><b>${s.name || 'Your name'}</b> · ${AUD.format(s.amount || needed)}${s.link && html` · <a href=${s.link} target="_blank" rel="sponsored nofollow noopener">${s.site || siteName(s.link)} ↗</a>`}</p>
+          </div>
+        </div>`
+      : html`<div class="ts-body"><p class="ts-msg">Nobody holds the top spot yet. Your message, or your business, could be here.</p></div>`}
+      ${!draft && cta && html`<a class="ts-cta" href=${PAGES.shave + (PREVIEW ? '' : '#spot')}>${s ? `Outbid: donate ${AUD.format(needed)}+` : `Donate ${AUD.format(needed)}+ to take it`}</a>`}
+    </section>`;
+}
+
+// Shrinks a logo to fit 160px, as PNG, so it stays small
+function shrinkLogo(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 160 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      const out = c.toDataURL('image/png');
+      out.length > 100000 ? resolve(c.toDataURL('image/webp', .85)) : resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That image couldn't be opened. Try a PNG or JPG.")); };
+    img.src = url;
+  });
+}
+
+function SpotStep({ me, spot, sample, onClaim }) {
+  const [kind, setKind] = useState('person');
+  const [f, setF] = useState({ name: '', message: '', link: '', logo: null });
+  const [busy, setBusy] = useState(false), [err, setErr] = useState(''), [done, setDone] = useState(false);
+  useEffect(() => { setF(x => ({ ...x, name: x.name || (kind === 'person' ? me.name : '') })); }, [me.name, kind]);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const step = spot ? spot.step : 5, needed = spot ? spot.needed : 20, past = spot ? spot.past : [];
+  const pickLogo = async (e) => { const file = e.target.files[0]; if (!file) return; try { setF({ ...f, logo: await shrinkLogo(file) }); setErr(''); } catch (x) { setErr(x.message); } };
+  const submit = async (e) => {
+    e.preventDefault(); if (busy) return;
+    setBusy(true); setErr('');
+    try { await onClaim({ receipt: me.spot.receipt, kind, name: f.name, message: f.message, link: kind === 'business' ? f.link : '', logo: kind === 'business' ? f.logo : null }); setDone(true); setF({ name: '', message: '', link: '', logo: null }); }
+    catch (x) { setErr(x.message); }
+    setBusy(false);
+  };
+  const draft = me.spot && { kind, name: f.name, message: f.message, link: kind === 'business' && f.link ? f.link : null, site: siteName(f.link), amount: me.spot.amount, logo: kind === 'business' ? f.logo : null };
+  return html`
+    <section class="step" id="spot" aria-labelledby="step-6">
+      <h2 class="step-h" id="step-6"><span class="step-n">06</span>Take the top spot</h2>
+      <ul class="points">
+        <li><span>The top of my home page shows one message, from a person or a business. To take it, donate <strong>${AUD.format(needed)} or more in one go</strong> (${AUD.format(step)} more than the donation showing now) and upload the receipt in step 2.</span></li>
+        <li><span>Write up to 100 characters. A business can add its name, logo and website.</span></li>
+        <li><span>It stays there until someone outbids you, and every message that held the spot is kept below. Your donation still earns tokens too.</span></li>
+        <li><span>Messages are checked automatically. Anything rude, hateful or spammy is turned down.</span></li>
+      </ul>
+      <${TopSpot} spot=${spot} sample=${sample} cta=${false} />
+      ${done && html`<p class="result ok" role="status">You've got the top spot. It's on the home page now.</p>`}
+      ${me.spot ? html`
+        <form class="spotform" onSubmit=${submit}>
+          <div class="seg" role="radiogroup" aria-label="Who it's from">
+            <button type="button" role="radio" id="spot-person" aria-checked=${kind === 'person'} onClick=${() => setKind('person')}>From me</button>
+            <button type="button" role="radio" id="spot-business" aria-checked=${kind === 'business'} onClick=${() => setKind('business')}>From a business</button>
+          </div>
+          <label for="spot-name">${kind === 'business' ? 'Business name' : 'Your name'}
+            <input id="spot-name" type="text" maxlength="40" value=${f.name} onInput=${set('name')} required=${kind === 'business'} placeholder=${kind === 'business' ? 'Northside Bakery' : 'Shown as written'} /></label>
+          <label for="spot-msg">Message <span class="count">${f.message.length}/100</span>
+            <input id="spot-msg" type="text" maxlength="100" value=${f.message} onInput=${set('message')} required placeholder=${kind === 'business' ? 'What you do, in a line' : 'For someone, or for everyone'} /></label>
+          ${kind === 'business' && html`
+            <div class="row2">
+              <label for="spot-link">Website <input id="spot-link" type="text" inputmode="url" maxlength="200" value=${f.link} onInput=${set('link')} placeholder="yourbusiness.com.au" /></label>
+              <label for="spot-logo">Logo (optional) <input id="spot-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange=${pickLogo} /></label>
+            </div>`}
+          <p class="label">Preview</p>
+          <${TopSpot} draft=${draft} spot=${spot} />
+          ${err && html`<p class="err" role="alert">${err}</p>`}
+          <button class="pbtn" type="submit" id="spot-submit" disabled=${busy}>${busy ? 'Checking your message…' : `Take the top spot with ${AUD.format(me.spot.amount)}`}</button>
+        </form>`
+      : html`<p class="note">${me.donated > 0 ? `Your biggest donation isn't enough to outbid the top spot yet. A new donation of ${AUD.format(needed)} or more would take it.` : `Upload a receipt for ${AUD.format(needed)} or more in step 2 and you can write your message here.`}${sample ? ` In this preview, set the pretend amount in step 2 to ${AUD.format(needed)} or more to try it.` : ''}</p>`}
+      ${past.length > 0 && html`
+        <div class="past">
+          <h3 class="label">Held the top spot before</h3>
+          <ol class="past-list">${past.map(s => html`
+            <li key=${s.id}>${s.logo ? html`<img src=${s.logo} alt="" width="28" height="28" />` : html`<span class="past-dot" aria-hidden="true"></span>`}
+              <p><span class="past-msg">${s.message}</span><span class="past-by">${s.name} · ${AUD.format(s.amount)}${s.link && html` · <a href=${s.link} target="_blank" rel="sponsored nofollow noopener">${s.site}</a>`}</span></p></li>`)}</ol>
+        </div>`}
+    </section>`;
+}
+
+/* ---------- Messages: anyone can post, no donation needed ---------- */
+const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : new Date(t).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }); };
+const HEART = [[1, 0], [2, 0], [4, 0], [5, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [2, 4], [3, 4], [4, 4], [3, 5]];
+const PixelHeart = () => html`<svg class="heart" viewBox="0 0 7 6" width="14" height="12" aria-hidden="true" shape-rendering="crispEdges">${HEART.map(([x, y]) => html`<rect key=${x + '-' + y} x=${x} y=${y} width="1" height="1" />`)}</svg>`;
+const TONES = ['paper', 'navy', 'paper', 'lime', 'paper', 'ink'];
+// Starter prompts give people a reason to write. The key is stored with the message; the label shows on its card.
+const PROMPTS = [
+  { key: 'for', label: "I'm here for…", hint: 'Who are you here for? Someone you know who has had cancer, and what they mean to you.' },
+  { key: 'joash', label: 'To Joash…', hint: 'Good luck, a roast, or a bet on how bad he looks bald.' },
+  { key: 'anyone', label: 'To anyone going through it…', hint: "What would you say to someone going through cancer right now?" },
+  { key: 'business', label: 'From my business…', hint: 'Say who you are and why you are backing the shave.' }
+];
+const promptOf = (k) => PROMPTS.find(p => p.key === k);
+const dedText = (d) => d && (d.kind === 'memory' ? 'In memory of ' : 'In honour of ') + d.name;
+
+function Messages({ api, me }) {
+  const [list, setList] = useState(null), [err, setErr] = useState(''), [loadErr, setLoadErr] = useState(false);
+  const [name, setName] = useState(''), [text, setText] = useState(''), [busy, setBusy] = useState(false), [fresh, setFresh] = useState(null);
+  const [prompt, setPrompt] = useState(null), [ded, setDed] = useState(''), [dedName, setDedName] = useState(''), [filter, setFilter] = useState('all');
+  useEffect(() => { api.messages().then(d => setList(d.messages), () => setLoadErr(true)); }, []);
+  useEffect(() => { setName(n => n || me.name); }, [me.name]);
+  const post = async (e) => {
+    e.preventDefault(); if (busy) return;
+    setBusy(true); setErr('');
+    try {
+      const d = await api.postMessage({ name: name.trim(), text: text.trim(), prompt, dedKind: ded || null, dedName: ded ? dedName.trim() : '' });
+      setList(d.messages); setFresh(d.messages[0] && d.messages[0].id); setText(''); setDed(''); setDedName(''); setFilter('all');
+    }
+    catch (x) { setErr(x.message); }
+    setBusy(false);
+  };
+  const cheer = async (id) => { try { setList((await api.cheer(id)).messages); } catch (_) { /* leave it */ } };
+  return html`
+    <div class="msgs">
+      <header class="msgs-head">
+        <h1 class="name">Leave a <em>message.</em></h1>
+        <p class="lede">For Joash, for someone you love who's been through cancer, or for everyone shaving and donating. No donation needed.</p>
+      </header>
+      <form class="composer" onSubmit=${post}>
+        <${PixelAvatar} look=${me.look} size=${56} label="Your avatar" className="composer-av" />
+        <div class="composer-fields">
+          <label for="msg-name" class="sr">Your name</label>
+          <input id="msg-name" type="text" maxlength="40" value=${name} onInput=${e => setName(e.target.value)} placeholder="Your name" required />
+          <div class="prompts" role="radiogroup" aria-label="Start with">
+            ${PROMPTS.map(p => html`<button type="button" role="radio" key=${p.key} aria-checked=${prompt === p.key} onClick=${() => setPrompt(prompt === p.key ? null : p.key)}>${p.label}</button>`)}
+          </div>
+          <label for="msg-text" class="sr">Your message</label>
+          <textarea id="msg-text" maxlength="280" rows="3" value=${text} onInput=${e => setText(e.target.value)} placeholder=${prompt ? promptOf(prompt).hint : 'Write something kind, or pick a prompt above.'} required></textarea>
+          <div class="ded">
+            <label for="msg-ded" class="sr">Dedicate it</label>
+            <select id="msg-ded" value=${ded} onChange=${e => setDed(e.target.value)}>
+              <option value="">No dedication</option><option value="honour">In honour of…</option><option value="memory">In memory of…</option>
+            </select>
+            ${ded && html`<label for="msg-ded-name" class="sr">Their name</label><input id="msg-ded-name" type="text" maxlength="40" value=${dedName} onInput=${e => setDedName(e.target.value)} placeholder="Their name" required />`}
+          </div>
+          <div class="composer-foot">
+            <span class="count">${text.length}/280 · Your avatar from the shave game goes with it</span>
+            <button class="pbtn" type="submit" id="msg-post" disabled=${busy || !text.trim() || !name.trim()}>${busy ? 'Checking…' : 'Post'}</button>
+          </div>
+          ${err && html`<p class="err" role="alert">${err}</p>`}
+        </div>
+      </form>
+      ${loadErr && html`<p class="err">Messages couldn't load just now. Refresh the page to try again.</p>`}
+      ${list && list.length === 0 && html`<p class="empty">No messages yet. Be the first.</p>`}
+      ${list && list.length > 0 && html`
+        <div class="wall-filter seg" role="radiogroup" aria-label="Show">
+          ${[['all', 'All'], ...PROMPTS.map(p => [p.key, p.label.replace('…', '')])].map(([k, l]) => html`<button type="button" role="radio" key=${k} aria-checked=${filter === k} onClick=${() => setFilter(k)}>${l}</button>`)}
+        </div>
+        <ul class="wall" aria-label="Messages">
+          ${list.filter(m => filter === 'all' || m.prompt === filter).map(m => html`
+            <li key=${m.id} class=${'mnote ' + TONES[m.id % TONES.length] + (m.text.length < 60 ? ' short' : '') + (m.id === fresh ? ' fresh' : '')}>
+              ${promptOf(m.prompt) && html`<p class="note-prompt">${promptOf(m.prompt).label}</p>`}
+              <p class="note-text">${m.text}</p>
+              ${m.dedication && html`<p class="note-ded">${dedText(m.dedication)}</p>`}
+              <div class="note-foot">
+                ${m.look ? html`<${PixelAvatar} look=${m.look} size=${28} label="" />` : html`<span class="note-dot" aria-hidden="true"></span>`}
+                <span class="note-by"><b>${m.name}</b><span>${ago(m.when)}</span></span>
+                <button type="button" class=${'cheer' + (m.cheered ? ' on' : '')} aria-pressed=${!!m.cheered} aria-label=${(m.cheered ? 'Remove your cheer for ' : 'Cheer ') + m.name + "'s message"} onClick=${() => cheer(m.id)}><${PixelHeart} />${m.cheers || ''}</button>
+              </div>
+            </li>`)}
+        </ul>`}
+    </div>`;
+}
+
+/* ---------- Messages video: turns the wall into a video Joash can post (made in the browser, nothing to set up) ---------- */
+const VTONES = [['#F3F3EF', '#0E1014', '#0A35A0'], ['#0A35A0', '#FFFFFF', '#C8F03C'], ['#C8F03C', '#0E1014', '#0A35A0'], ['#0E1014', '#F3F3EF', '#C8F03C']];
+const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+function wrapLines(ctx, text, width) {
+  const out = [];
+  for (const para of String(text).split('\n')) {
+    let line = '';
+    for (const w of para.split(/\s+/).filter(Boolean)) {
+      const next = line ? line + ' ' + w : w;
+      if (ctx.measureText(next).width > width && line) { out.push(line); line = w; } else line = next;
+    }
+    out.push(line);
+  }
+  return out;
+}
+// Biggest type that fits the box, so short messages land big and long ones still fit
+function fitText(ctx, text, width, height, max, min) {
+  for (let size = max; size >= min; size -= 4) {
+    ctx.font = `800 ${size}px Archivo`;
+    const lines = wrapLines(ctx, text, width);
+    if (lines.length * size * 1.08 <= height) return { size, lines };
+  }
+  ctx.font = `800 ${min}px Archivo`;
+  return { size: min, lines: wrapLines(ctx, text, width) };
+}
+function avatarArt(look) {
+  if (!look) return null;
+  const c = document.createElement('canvas'); c.width = c.height = ART;
+  paintArt(c.getContext('2d'), look);
+  return c;
+}
+function drawHeart(ctx, x, y, cell, color) {
+  ctx.fillStyle = color;
+  for (const [hx, hy] of HEART) ctx.fillRect(x + hx * cell, y + hy * cell, cell, cell);
+}
+
+function planVideo(list, W, H, host) {
+  const scenes = [{ kind: 'intro', dur: 3.4 }];
+  list.forEach((m, i) => scenes.push({ kind: 'msg', m, i, dur: Math.min(7, Math.max(3.2, 2.4 + m.text.length / 45)), art: avatarArt(m.look), tone: VTONES[i % VTONES.length] }));
+  scenes.push({ kind: 'outro', dur: 4.2 });
+  let t = 0; for (const sc of scenes) { sc.start = t; t += sc.dur; }
+  const faces = list.slice(0, 24).map(m => avatarArt(m.look)).filter(Boolean);
+  const pad = 80, total = t;
+  function label(ctx, text, x, y, color) { ctx.font = '400 26px Silkscreen'; ctx.fillStyle = color; ctx.textBaseline = 'alphabetic'; ctx.fillText(text.toUpperCase(), x, y); }
+  function scene(ctx, sc, t) {
+    const k = t - sc.start;
+    ctx.imageSmoothingEnabled = false;
+    ctx.fontStretch = 'semi-expanded';
+    if (sc.kind === 'intro') {
+      ctx.fillStyle = '#F3F3EF'; ctx.fillRect(0, 0, W, H);
+      label(ctx, "Joash's World's Greatest Shave", pad, pad + 20, '#5B5F68');
+      const up = 60 * (1 - ease(k / .6));
+      ctx.globalAlpha = ease(k / .5);
+      ctx.font = '800 150px Archivo'; ctx.textBaseline = 'top'; ctx.fillStyle = '#0E1014';
+      ctx.fillText('Messages', pad, H * .26 + up); ctx.fillText('for', pad, H * .26 + 140 + up);
+      ctx.fillStyle = '#0A35A0'; ctx.fillText('Joash.', pad + ctx.measureText('for ').width, H * .26 + 140 + up);
+      ctx.globalAlpha = 1;
+      ctx.font = '500 34px "Schibsted Grotesk"'; ctx.fillStyle = '#5B5F68';
+      ctx.fillText(`${list.length} message${list.length === 1 ? '' : 's'} from people backing the shave`, pad, H * .26 + 330);
+      const size = 72, gap = 8, per = Math.floor((W - pad * 2 + gap) / (size + gap));
+      faces.slice(0, per * 2).forEach((f, i) => {
+        if (k < .8 + i * .06) return;
+        ctx.fillStyle = '#E8E8E2'; const x = pad + (i % per) * (size + gap), y = H - pad - size * 2 - gap + Math.floor(i / per) * (size + gap);
+        ctx.fillRect(x, y, size, size); ctx.drawImage(f, x, y, size, size);
+      });
+    } else if (sc.kind === 'outro') {
+      ctx.fillStyle = '#0A35A0'; ctx.fillRect(0, 0, W, H);
+      const up = 50 * (1 - ease(k / .6));
+      ctx.globalAlpha = ease(k / .5);
+      ctx.font = '800 150px Archivo'; ctx.textBaseline = 'top'; ctx.fillStyle = '#FFFFFF';
+      ctx.fillText('Leave', pad, H * .24 + up); ctx.fillStyle = '#C8F03C'; ctx.fillText('yours.', pad, H * .24 + 140 + up);
+      ctx.globalAlpha = 1;
+      ctx.font = '600 44px "Schibsted Grotesk"'; ctx.fillStyle = '#FFFFFF'; ctx.fillText(host + '/messages', pad, H * .24 + 340);
+      label(ctx, 'Donate to the shave', pad, H - pad - 70, '#C8F03C');
+      ctx.font = '500 32px "Schibsted Grotesk"'; ctx.fillStyle = '#FFFFFF'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('worldsgreatestshave.com/fundraisers/joashj', pad, H - pad);
+    } else {
+      const [bg, fg, hi] = sc.tone, m = sc.m;
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      label(ctx, `${promptOf(m.prompt) ? promptOf(m.prompt).label : 'Messages for Joash'}  ${sc.i + 1}/${list.length}`, pad, pad + 20, fg);
+      ctx.fillStyle = hi; ctx.font = '800 160px Archivo'; ctx.textBaseline = 'top'; ctx.fillText('“', pad - 6, pad + 40);
+      const box = { x: pad, y: pad + 200, w: W - pad * 2, h: H - pad * 2 - 200 - 170 - (m.dedication ? 70 : 0) };
+      const { size, lines } = fitText(ctx, m.text, box.w, box.h, m.text.length < 40 ? 120 : 88, 40);
+      ctx.fillStyle = fg; ctx.textBaseline = 'top';
+      lines.forEach((ln, i) => {
+        const a = ease((k - .15 - i * .07) / .45);
+        ctx.globalAlpha = a; ctx.fillText(ln, box.x, box.y + i * size * 1.08 + 30 * (1 - a));
+      });
+      ctx.globalAlpha = ease((k - .5) / .4);
+      const ay = H - pad - 112;
+      if (m.dedication) { ctx.fillStyle = hi; ctx.fillRect(pad, ay - 82, 8, 44); ctx.fillStyle = fg; ctx.font = '700 36px Archivo'; ctx.textBaseline = 'middle'; ctx.fillText(dedText(m.dedication), pad + 24, ay - 60); }
+      if (sc.art) { ctx.fillStyle = 'rgba(127,127,127,.18)'; ctx.fillRect(pad, ay, 112, 112); ctx.drawImage(sc.art, pad, ay, 112, 112); }
+      const nx = pad + (sc.art ? 140 : 0);
+      ctx.fillStyle = fg; ctx.textBaseline = 'alphabetic'; ctx.font = '700 40px "Schibsted Grotesk"'; ctx.fillText(m.name, nx, ay + 52);
+      if (m.cheers) { drawHeart(ctx, nx, ay + 76, 5, hi === '#C8F03C' && bg !== '#0E1014' && bg !== '#0A35A0' ? fg : hi); ctx.font = '600 30px "Schibsted Grotesk"'; ctx.fillStyle = fg; ctx.fillText(String(m.cheers), nx + 48, ay + 104); }
+      ctx.globalAlpha = 1;
+    }
+  }
+  function draw(ctx, t) {
+    const i = Math.max(0, scenes.findIndex(sc => t < sc.start + sc.dur));
+    const sc = scenes[i === -1 ? scenes.length - 1 : i], prev = scenes[i - 1], w = (t - sc.start) / .35;
+    if (prev && w < 1) {
+      // A hard-edged wipe from the left: the old card stays put while the new one slides over it
+      scene(ctx, prev, prev.start + prev.dur - .001);
+      const x = W * (1 - ease(w));
+      ctx.save(); ctx.beginPath(); ctx.rect(x, 0, W - x, H); ctx.clip(); ctx.translate(x * .15, 0); scene(ctx, sc, t); ctx.restore();
+    } else scene(ctx, sc, t);
+    ctx.fillStyle = '#C8F03C'; ctx.fillRect(0, H - 10, W * Math.min(1, t / total), 10);
+  }
+  return { draw, total };
+}
+
+function MessageVideo({ api, config }) {
+  const [list, setList] = useState(null), [pick, setPick] = useState('top20'), [shape, setShape] = useState('square');
+  const [state, setState] = useState('idle'), [progress, setProgress] = useState(0), [out, setOut] = useState(null), [err, setErr] = useState('');
+  const canvas = useRef(null), stop = useRef(false);
+  useEffect(() => { api.messages().then(d => setList(d.messages), () => setErr("Messages couldn't load. Refresh to try again.")); }, []);
+  const W = 1080, H = shape === 'square' ? 1080 : 1350;
+  const chosen = useMemo(() => {
+    if (!list) return [];
+    const byCheers = list.slice().sort((a, b) => b.cheers - a.cheers || b.when - a.when);
+    return pick === 'top10' ? byCheers.slice(0, 10) : pick === 'top20' ? byCheers.slice(0, 20) : list.slice(0, 40).reverse();
+  }, [list, pick]);
+  const host = PREVIEW ? 'joashjobson.workers.dev' : location.host;
+  const plan = useMemo(() => chosen.length ? planVideo(chosen, W, H, host) : null, [chosen, W, H]);
+  // Still frame of the first message while nothing is recording
+  useEffect(() => {
+    if (!plan || state === 'recording') return;
+    document.fonts.ready.then(() => plan.draw(canvas.current.getContext('2d'), 3.4 + 1.6));
+  }, [plan, state]);
+
+  const make = async () => {
+    setErr(''); setOut(null);
+    const types = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+    const type = window.MediaRecorder && types.find(t => MediaRecorder.isTypeSupported(t));
+    if (!type || !canvas.current.captureStream) { setErr("This browser can't record video. Try Chrome or Safari on a computer."); return; }
+    await Promise.all(['800 100px Archivo', '600 40px "Schibsted Grotesk"', '400 26px Silkscreen'].map(f => document.fonts.load(f).catch(() => {})));
+    const ctx = canvas.current.getContext('2d');
+    plan.draw(ctx, 0);
+    const stream = canvas.current.captureStream(30), rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8000000 }), chunks = [];
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      if (stop.current) { setState('idle'); return; }
+      const blob = new Blob(chunks, { type: type.split(';')[0] });
+      setOut({ url: URL.createObjectURL(blob), ext: type.includes('mp4') ? 'mp4' : 'webm', mb: blob.size / 1e6 });
+      setState('done');
+    };
+    stop.current = false; setState('recording'); rec.start(1000);
+    const t0 = performance.now();
+    const frame = () => {
+      const t = (performance.now() - t0) / 1000;
+      if (stop.current || t >= plan.total) { plan.draw(ctx, plan.total - .001); rec.stop(); return; }
+      plan.draw(ctx, t); setProgress(t / plan.total);
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  };
+  const secs = plan ? Math.round(plan.total) : 0;
+  return html`
+    <div class="msgs vid">
+      <header class="msgs-head">
+        <h1 class="name">Messages <em>video.</em></h1>
+        <p class="lede">Turns the message wall into a video for LinkedIn or Instagram. It plays through once while it records, so keep this tab open.</p>
+      </header>
+      <div class="vid-grid">
+        <div class="vid-stage"><canvas ref=${canvas} width=${W} height=${H} aria-label="Video preview"></canvas></div>
+        <div class="vid-side">
+          <div><p class="label">Which messages</p>
+            <div class="seg" role="radiogroup" aria-label="Which messages">
+              ${[['top10', 'Top 10'], ['top20', 'Top 20'], ['recent', 'Newest 40']].map(([v, l]) => html`<button type="button" role="radio" aria-checked=${pick === v} disabled=${state === 'recording'} onClick=${() => setPick(v)}>${l}</button>`)}
+            </div>
+            <p class="note">Top means the most cheered.</p></div>
+          <div><p class="label">Shape</p>
+            <div class="seg" role="radiogroup" aria-label="Shape">
+              ${[['square', 'Square 1:1'], ['tall', 'Tall 4:5']].map(([v, l]) => html`<button type="button" role="radio" aria-checked=${shape === v} disabled=${state === 'recording'} onClick=${() => setShape(v)}>${l}</button>`)}
+            </div></div>
+          ${list && html`<p>${chosen.length} message${chosen.length === 1 ? '' : 's'}, about ${secs} seconds.</p>`}
+          ${list && !chosen.length && html`<p class="empty">No messages yet, so there's nothing to make a video of.</p>`}
+          ${state === 'recording'
+            ? html`<div class="vid-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow=${Math.round(progress * 100)}><span style=${{ width: progress * 100 + '%' }}></span></div>
+                <button class="btn ghost" type="button" onClick=${() => { stop.current = true; }}>Stop</button>`
+            : html`<button class="pbtn" type="button" id="make-video" disabled=${!plan} onClick=${make}>${out ? 'Make it again' : 'Make the video'}</button>`}
+          ${out && html`
+            <a class="btn hot" id="video-download" href=${out.url} download=${`messages-for-joash.${out.ext}`}>Download (${out.mb.toFixed(1)} MB ${out.ext.toUpperCase()})</a>
+            ${out.ext === 'webm' && html`<p class="note">This browser saved a WebM file. LinkedIn wants MP4, so make it in Chrome or Safari instead.</p>`}`}
+          ${err && html`<p class="err" role="alert">${err}</p>`}
+        </div>
+      </div>
+    </div>`;
+}
+
 /* ---------- The shave page ---------- */
 function WgsFundraiserSection({ me, boards, config, actions }) {
   const price = config.tokenPrice;
@@ -828,7 +1260,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
           <button type="button" class="textlink" onClick=${toGame}>Skip to the game</button>
         </div>
         <ol class="stepnav" aria-label="Steps">
-          ${[['step-1', 'Donate'], ['step-2', 'Upload your receipt'], ['step-3', 'Make your avatar'], ['step-4', 'Shave'], ['step-5', 'Leaderboard']].map(([id, t], i) =>
+          ${[['step-1', 'Donate'], ['step-2', 'Upload your receipt'], ['step-3', 'Make your avatar'], ['step-4', 'Shave'], ['step-5', 'Leaderboard'], ['spot', 'Take the top spot']].map(([id, t], i) =>
             html`<li key=${id}><a href=${'#' + id} onClick=${e => { e.preventDefault(); document.getElementById(id).closest('section').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth' }); }}><span>0${i + 1}</span>${t}</a></li>`)}
         </ol>
       </header>
@@ -857,6 +1289,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
         </ul>
         <${Tokens} me=${me} price=${price} />
         <${ReceiptUpload} receipts=${me.receipts} onUpload=${actions.upload} />
+        ${me.spot && html`<p class="result ok spot-hint">Your ${AUD.format(me.spot.amount)} donation is big enough to take the top spot on the home page. <a class="textlink" href="#spot" onClick=${e => { e.preventDefault(); document.getElementById('spot').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth' }); }}>Write your message</a></p>`}
       </section>
 
       <section class="step" aria-labelledby="step-3">
@@ -892,6 +1325,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
         </ul>
         <${Leaderboard} boards=${boards} sample=${config.sample} />
       </section>
+      <${SpotStep} me=${me} spot=${config.spot} sample=${config.sample} onClaim=${actions.claimSpot} />
       </div>
     </div>`;
 }
@@ -900,7 +1334,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
 // Joash's World's Greatest Shave page. Every donate link on the site uses it.
 const FUNDRAISER = { url: 'https://www.worldsgreatestshave.com/fundraisers/joashj' };
 const START_LOOK = { skin: 2, hair: 1, style: 5, eyes: 2, face: 1, shirt: 1, extra: 0 };
-const EMPTY_ME = { name: '', look: START_LOOK, donated: 0, tokens: 0, freeLeft: true, rankedLeft: 0, ownLeft: 0, best: null, receipts: [] };
+const EMPTY_ME = { name: '', look: START_LOOK, donated: 0, tokens: 0, freeLeft: true, rankedLeft: 0, ownLeft: 0, best: null, receipts: [], spot: null };
 
 // No sign-up: each browser gets a random ID the first time, and the Worker saves everything under it.
 function playerId() {
@@ -928,7 +1362,11 @@ function RemoteAPI() {
     upload: (blob, filename) => { const fd = new FormData(); fd.append('player', player); fd.append('file', blob, filename); return call('receipt', { method: 'POST', body: fd }); },
     profile: (p) => post('profile', p),
     start: (mode) => post('run/start', { mode }),
-    finish: (o) => post('run/finish', o)
+    finish: (o) => post('run/finish', o),
+    claimSpot: (o) => post('spot', o),
+    messages: () => call('messages?player=' + player),
+    postMessage: (o) => post('message', o),
+    cheer: (id) => post('cheer', { id })
   };
 }
 
@@ -943,18 +1381,43 @@ const SAMPLE_LOOKS = {
 const SAMPLE_DONORS = [['Priya S.', 250], ['Tom W.', 180], ['Ana L.', 120], ['Ben K.', 60], ['Mei C.', 40]].map(([name, amount]) => ({ name, amount, look: SAMPLE_LOOKS[name] }));
 const SAMPLE_TIMES = [['Tom W.', 38.42], ['Ana L.', 44.07], ['Priya S.', 51.9], ['Ben K.', 63.15], ['Mei C.', 79.6]].map(([name, secs]) => ({ name, secs, look: SAMPLE_LOOKS[name] }));
 
+const HOUR = 3600000, NOW = Date.now();
+const SAMPLE_SPOTS = [
+  { id: 901, kind: 'person', name: 'Priya S.', message: 'For my dad, three years clear this March. Keep going, Joash!', link: null, site: null, amount: 250, logo: null, when: NOW - 5 * HOUR },
+  { id: 902, kind: 'business', name: 'Northside Bakery', message: 'Fresh sourdough every morning. Proud to back the shave.', link: 'https://example.com', site: 'example.com', amount: 180, logo: null, when: NOW - 30 * HOUR },
+  { id: 903, kind: 'person', name: 'Tom W.', message: 'Beat my time if you can.', link: null, site: null, amount: 120, logo: null, when: NOW - 52 * HOUR }
+];
+const SAMPLE_MESSAGES = [
+  ['Ana L.', 'for', 'My nan. She had leukaemia when I was ten and the nurses were incredible. She still talks about them.', 14, 2, ['honour', 'Nan (Rosa)']],
+  ['Tom W.', 'joash', 'Absolute legend. See you on shave day.', 9, 4],
+  ['Mei C.', 'anyone', 'You are not on your own. Eat the good snacks, take the nap, let people help.', 16, 7],
+  ['Northside Bakery', 'business', 'Free coffee for anyone who shows us they donated. Proud to back the shave.', 7, 12],
+  ['Ben K.', 'for', 'My uncle Dave, who taught me to fish and never once let me win.', 21, 20, ['memory', 'Uncle Dave']],
+  ['Priya S.', 'anyone', 'For everyone who has sat in a waiting room hoping for good news. This one is for you.', 23, 26],
+  ['Sam R.', 'joash', 'Go Joash!', 4, 40]
+].map(([name, prompt, text, cheers, h, ded], i) => ({ id: 800 + i, name, prompt, text, look: SAMPLE_LOOKS[name] || (prompt === 'business' ? null : { skin: 2, hair: 0, style: 2, eyes: 1, face: 4, shirt: 0, extra: 0 }), cheers, cheered: false, when: NOW - h * HOUR, dedication: ded ? { kind: ded[0], name: ded[1] } : null }));
+
 function LocalAPI() {
   const price = 20;
-  const p = { name: '', look: START_LOOK, cents: 0, spent: 0, freeUsed: false, rankedLeft: 0, ownLeft: 0, bestMs: null, receipts: [], runs: {} };
+  const p = { name: '', look: START_LOOK, cents: 0, spent: 0, freeUsed: false, rankedLeft: 0, ownLeft: 0, bestMs: null, receipts: [], runs: {}, spots: SAMPLE_SPOTS.slice(), used: new Set(), msgs: SAMPLE_MESSAGES.map(m => ({ ...m })) };
+  let nextId = 1;
+  const needed = () => { const c = p.spots[0]; return c ? c.amount + 5 : price; };
+  const spotReceipt = () => { const r = p.receipts.filter(r => r.status === 'ok' && r.amount >= needed() && !p.used.has(r.id)).sort((a, b) => b.amount - a.amount)[0]; return r ? { receipt: r.id, amount: r.amount } : null; };
+  const msgs = () => ({ messages: p.msgs.slice() });
+  const screen = (t) => {
+    if (/badword/i.test(t)) throw new Error("This can't go up. Keep it friendly, with no swearing, hate, adult content, scams or personal details.");
+    if (/(donate|pay|send|give)\b.{0,30}\b(to|me)\b(?!.{0,4}joash)|pay ?id|bsb|gofundme/i.test(t) && !/donate to joash/i.test(t)) throw new Error("This can't go up. Posts can't ask people to donate or send money to anyone except Joash's fundraiser.");
+  };
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   const view = () => {
     const tokens = Math.max(0, tokensFor(p.cents / 100, price) - p.spent);
-    const me = { name: p.name, look: p.look, donated: p.cents / 100, tokens, freeLeft: !p.freeUsed, rankedLeft: p.rankedLeft, ownLeft: p.ownLeft, best: p.bestMs == null ? null : p.bestMs / 1000, receipts: p.receipts.slice().reverse() };
+    const me = { name: p.name, look: p.look, donated: p.cents / 100, tokens, freeLeft: !p.freeUsed, rankedLeft: p.rankedLeft, ownLeft: p.ownLeft, best: p.bestMs == null ? null : p.bestMs / 1000, receipts: p.receipts.slice().reverse(), spot: spotReceipt() };
     const you = { name: p.name || 'You', look: p.look, me: true };
     const donors = [...SAMPLE_DONORS, ...(p.cents > 0 ? [{ ...you, amount: p.cents / 100 }] : [])].sort((a, b) => b.amount - a.amount).slice(0, 10);
     const shavers = [...SAMPLE_TIMES, ...(p.bestMs != null ? [{ ...you, secs: p.bestMs / 1000 }] : [])].sort((a, b) => a.secs - b.secs).slice(0, 10);
     const people = [...SAMPLE_DONORS, ...(p.cents > 0 ? [{ amount: p.cents / 100 }] : [])];
-    return { me, boards: { donors, shavers }, config: { tokenPrice: price, sample: true, raised: people.reduce((t, d) => t + d.amount, 0), donors: people.length } };
+    const spot = { current: p.spots[0] || null, needed: needed(), step: 5, past: p.spots.slice(1) };
+    return { me, boards: { donors, shavers }, config: { tokenPrice: price, sample: true, raised: people.reduce((t, d) => t + d.amount, 0), donors: people.length, spot } };
   };
   return {
     load: async () => view(),
@@ -967,7 +1430,7 @@ function LocalAPI() {
       else if (pv.to === 'busy' && amount > 0) {
         // Stands in for the queue: "checked" a few seconds later
         result = { status: 'pending' };
-        const entry = { amount: null, status: 'pending', reason: null, when: Date.now() };
+        const entry = { id: nextId++, amount: null, status: 'pending', reason: null, when: Date.now() };
         setTimeout(() => { entry.status = 'ok'; entry.amount = amount; p.cents += Math.round(amount * 100); if (!p.name) p.name = 'Sam L.'; }, 6000);
         p.receipts.push(entry);
         const v = view();
@@ -979,7 +1442,7 @@ function LocalAPI() {
         if (!p.name) p.name = 'Sam L.';
         result = { status: 'ok', amount, name: 'Sam L.' };
       }
-      p.receipts.push({ amount: result.status === 'ok' ? amount : null, status: result.status, reason: result.reason, when: Date.now() });
+      p.receipts.push({ id: nextId++, amount: result.status === 'ok' ? amount : null, status: result.status, reason: result.reason, when: Date.now() });
       const v = view();
       return { ...v, result: { ...result, tokens: v.me.tokens } };
     },
@@ -1002,7 +1465,25 @@ function LocalAPI() {
       if (run.mode === 'ranked') { const ms = Math.round(secs * 1000); if (p.bestMs == null || ms < p.bestMs) p.bestMs = ms; }
       delete p.runs[runId];
       return view();
-    }
+    },
+    claimSpot: async ({ receipt, kind, name, message, link, logo }) => {
+      await wait(700);
+      const r = p.receipts.find(r => r.id === receipt);
+      if (!r || p.used.has(receipt) || r.amount < needed()) throw new Error(`The top spot now needs a donation of $${needed()} or more.`);
+      screen(name + ' ' + message);
+      p.used.add(receipt);
+      const site = link ? link.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0] : null;
+      p.spots.unshift({ id: nextId++, kind, name: name || p.name || 'Anonymous', message, link: link ? (/^https?:/i.test(link) ? link : 'https://' + link) : null, site, amount: r.amount, logo: logo || null, when: Date.now() });
+      return { ...view(), took: true };
+    },
+    messages: async () => msgs(),
+    postMessage: async ({ name, text, prompt, dedKind, dedName }) => {
+      await wait(600); screen(name + ' ' + text + ' ' + (dedName || ''));
+      if (dedKind && !dedName) throw new Error('Add the name of the person it is for.');
+      p.msgs.unshift({ id: nextId++, name, text, prompt: prompt || null, look: p.look, cheers: 0, cheered: false, when: Date.now(), dedication: dedKind ? { kind: dedKind, name: dedName } : null });
+      return { ...msgs(), posted: true };
+    },
+    cheer: async (id) => { const m = p.msgs.find(m => m.id === id); if (m) { m.cheered = !m.cheered; m.cheers += m.cheered ? 1 : -1; } return msgs(); }
   };
 }
 
@@ -1125,6 +1606,7 @@ function ThemeToggle() {
 function Home({ boards, config }) {
   return html`
     <div class="home">
+      <${TopSpot} spot=${config.spot} sample=${config.sample} />
       <section class="intro" aria-labelledby="hi">
         <h1 class="name" id="hi">Hi, I'm <em>Joash.</em></h1>
         <p class="lede">When I start something, I get obsessed with seeing it through from start to finish. I love building things, online or with my hands, and I'm always picking up new skills, from finance to writing software.</p>
@@ -1141,7 +1623,7 @@ function Privacy() {
   return html`
     <div class="simple policy">
       <div>
-        <p class="eyebrow">Last updated 26 October 2026</p>
+        <p class="eyebrow">Last updated 27 October 2026</p>
         <h1 class="name">Privacy</h1>
       </div>
       <p class="lede">This site raises money for Joash Jobson's World's Greatest Shave. It keeps as little about you as it can. Here's exactly what that is.</p>
@@ -1152,6 +1634,8 @@ function Privacy() {
         html`<p>The screenshot itself isn't kept. If the checker is busy, it waits in a queue and is deleted as soon as it's been checked. The site keeps what was read from it: the amount, receipt number, donor name, who it went to and whether it was accepted, so a receipt can't be counted twice.</p>`)}
       ${sec('The leaderboard',
         html`<p>Your leaderboard name is the one you choose, or your first name and last initial from your receipt (like "Sam L."). Full names are never shown publicly. The leaderboards show that name, your avatar, your total donated and your best shave time.</p>`)}
+      ${sec('Messages and the top spot',
+        html`<p>Messages, and whatever is written in the top spot (a name, message, website and logo), are public. A message shows the name you type, your avatar and any "In honour of" or "In memory of" name you add, so only add someone's name if you're happy for it to be seen. Before anything goes up, the words (and any logo) are sent to Groq to check they're friendly. Joash can take any post down, and he may share messages in a video on social media, like LinkedIn.</p>`)}
       ${sec('Who sees what',
         html`<p>Everyone can see the leaderboards. Joash can see the details read from each receipt on his admin page, and gets an email with the name, amount and receipt number when a donation is added. Nobody else gets your information, and it's never sold.</p>`)}
       ${sec('Where it\'s kept',
@@ -1161,9 +1645,11 @@ function Privacy() {
     </div>`;
 }
 
-// Three pages: home, the shave game and privacy. The live site serves them as /, /shave and /privacy; the preview uses #hashes.
+// Four pages: home, the shave game, messages and privacy. The live site serves them as /, /shave, /messages and /privacy; the preview uses #hashes.
 function useRoute() {
-  const get = () => PREVIEW ? ({ '#shave': 'shave', '#privacy': 'privacy' }[location.hash] || 'home') : (document.body.dataset.page || 'home');
+  // The messages video maker lives at /messages#video (Joash opens it from the admin page)
+  const get = () => PREVIEW ? ({ '#shave': 'shave', '#privacy': 'privacy', '#messages': 'messages', '#video': 'video' }[location.hash] || 'home')
+    : document.body.dataset.page === 'messages' && location.hash === '#video' ? 'video' : (document.body.dataset.page || 'home');
   const [route, setRoute] = useState(get);
   useEffect(() => {
     if (!PREVIEW) return;
@@ -1209,14 +1695,16 @@ function App() {
     },
     setName: async (name) => apply(await api.profile({ name })),
     start: async (mode) => apply(await api.start(mode)),
-    finish: async (o) => apply(await api.finish(o))
+    finish: async (o) => apply(await api.finish(o)),
+    claimSpot: async (o) => apply(await api.claimSpot(o))
   }), [api, apply]);
 
   return html`
     <header class="topbar">
       <div class="topbar-in">
-        <a href=${PAGES.home} class="home-link" aria-current=${route === 'home' ? 'page' : null}><${PixelAvatar} look=${JOASH} size=${28} label="" />Joash Jobson</a>
+        <a href=${PAGES.home} class="home-link" aria-current=${route === 'home' ? 'page' : null}><${PixelAvatar} look=${JOASH} size=${28} label="" /><span>Joash<span class="surname"> Jobson</span></span></a>
         <nav class="toplinks" aria-label="Main">
+          <a href=${PAGES.messages} aria-current=${route === 'messages' ? 'page' : null}>Messages</a>
           <a href=${PAGES.shave} aria-current=${route === 'shave' ? 'page' : null}>Shave game</a>
           <${ThemeToggle} />
         </nav>
@@ -1226,6 +1714,8 @@ function App() {
     <main>
       ${route === 'home' ? html`<${Home} boards=${boards} config=${config} />`
         : route === 'privacy' ? html`<${Privacy} />`
+        : route === 'messages' ? html`<${Messages} api=${api} me=${me} />`
+        : route === 'video' ? html`<${MessageVideo} api=${api} config=${config} />`
         : html`<${WgsFundraiserSection} me=${me} boards=${boards} config=${config} actions=${actions} />`}
     </main>
     <footer><div class="wrap"><span>© 2026 Joash Jobson</span><span class="foot-links"><a href=${PAGES.privacy}>Privacy</a><a href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a></span></div></footer>`;

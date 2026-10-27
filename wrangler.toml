@@ -44,6 +44,10 @@ FUNDRAISER_NAME = "Joash Jobson"
 FUNDRAISER_URL = "https://www.worldsgreatestshave.com/fundraisers/joashj"
 # Dollars (AUD) per token. Each person's total is rounded to the nearest token, so at 20, $29 is 1 token and $31 is 2.
 TOKEN_PRICE_AUD = "20"
+# The top spot on the home page: the first message needs a donation of at least TOP_SPOT_MIN_AUD, and each takeover must beat
+# the donation showing by at least TOP_SPOT_STEP_AUD (AUD).
+TOP_SPOT_MIN_AUD = "20"
+TOP_SPOT_STEP_AUD = "5"
 # Groq model that reads receipts (free plan). It must be a Groq vision model that supports strict JSON schema output.
 GROQ_MODEL = "qwen/qwen3.8-27b"
 # Most receipts Groq checks per day. Each receipt uses about 3,000 of the free plan's 200,000 daily tokens, so 60 stays under it.

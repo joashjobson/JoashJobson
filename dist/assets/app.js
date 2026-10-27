@@ -75,13 +75,15 @@ const inFace = (x, y) => Math.abs(x + .5 - 32) <= faceHalf(y);
 
 // Hair shapes. front(x, y) covers the face; back(x, y) sits behind the head and shoulders.
 const HAIR_SHAPES = {
+  // Neat short hair with height on top, a soft fringe swept to one side, and trimmed sides
   Short: {
     front: (x, y) => {
-      const dx = x + .5 - 32, dy = y + .5 - 22, a = Math.atan2(dy, dx), R = 15.6 + 2.8 * tri(a / (2 * Math.PI) * 11 + .2);
-      if (dx * dx + dy * dy > R * R) return false;
-      const ax = Math.abs(dx), line = ax <= 12 ? 18.5 + 3.5 * tri((x - 13) / 6) : 29;
-      return y < line && y < 31;
-    }, cx: 32, cy: 21
+      const dx = x + .5 - 32, ax = Math.abs(dx);
+      if (!ellIn(x, y, 32, 21, 14.8, 15.2)) return false;
+      if (ax > 11.2) return y < 26 - (ax > 13.4 ? 1 : 0);                  // short sides down to the tops of the ears
+      const tip = [0, 1, 2, 1, 0, 0, 1, 2, 2, 1, 0, 1][x % 12];             // uneven fringe tips
+      return y < 15.2 - dx * .1 + tip * .6;
+    }, cx: 31, cy: 17, neat: true
   },
   Buzz: { front: (x, y) => ellIn(x, y, 32, 25, 13.8, 16.6) && y < (Math.abs(x + .5 - 32) > 11.5 ? 27 : Math.abs(x + .5 - 32) > 8 ? 18 : 19), cx: 32, cy: 22, fine: true },
   Curly: {
@@ -125,6 +127,16 @@ function renderPortrait(look) {
   const hairTone = (x, y, back) => {
     const cx = shape.cx, cy = shape.cy, L = lit(x, y, cx - 2, cy + 2, 20, 20);
     let t = L < .25 ? 2 : L < .55 ? 3 : 4;
+    if (shape.neat) {
+      // combed forward: strands fall from above the crown towards the fringe, with a curved shine on the lit side
+      const a = Math.atan2(x + .5 - 31, y + .5 + 8) * 13 + Math.sin(y * .5) * .25, f = a - Math.floor(a);
+      if (f < .14) t = Math.max(1, Math.min(t, 3) - 1);
+      else if (f > .48 && f < .74 && L > .4) t = Math.min(5, t + 1);
+      const r2 = Math.hypot(x + .5 - 32, y + .5 - 21);
+      if (r2 > 10.5 && r2 < 13 && L > .55 && y < 15 && f > .25) t = 5;
+      if (Math.abs(x + .5 - 32) > 11.2 && y > 18) t = Math.min(t, 2);       // trimmed sides read darker
+      return Math.max(1, Math.min(5, t - (back ? 1 : 0)));
+    }
     if (shape.fine) return Math.max(1, Math.min(4, t) - ((x + y) % 2 ? 0 : 1) - (back ? 1 : 0));
     const r = Math.hypot(x + .5 - cx, y + .5 - cy);
     if (shape.curly) {
@@ -1002,7 +1014,7 @@ function DonateTile({ price }) {
       let x0 = N, x1 = -1;
       for (let yy = y - 2; yy <= y; yy++) for (let x = 0; x < N; x++) if (yy >= 0 && yy < N && head.kind[yy * N + x] === HAIR) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
       if (x1 < 0) continue;
-      path.push(dir > 0 ? [x0, y] : [x1 + 1, y], dir > 0 ? [x1 + 1, y] : [x0, y]); dir = -dir;
+      path.push(dir > 0 ? [x0 - 1, y] : [x1 + 2, y], dir > 0 ? [x1 + 2, y] : [x0 - 1, y]); dir = -dir;
     }
     let seg = 0, t = 0, mode = 'auto', idle = 0, regrow = 0, user = null, raf, last = performance.now();
     const still = reduceMotion();
@@ -1027,12 +1039,15 @@ function DonateTile({ price }) {
         idle += dt;
         if (idle > 2.5) { mode = 'regrow'; regrow = 0; }
       } else if (mode === 'auto' && !still) {
-        const [ax, ay] = path[seg], [bx, by] = path[Math.min(seg + 1, path.length - 1)];
-        const len = Math.hypot(bx - ax, by - ay) || 1;
-        t += dt * 46 / len;
-        if (t >= 1) { t -= 1; seg++; }
-        if (seg >= path.length - 1) { mode = 'pause'; idle = 0; }
-        else { clip = [ax + (bx - ax) * t, ay + (by - ay) * t]; cut(clip[0], clip[1], 90 * dt); }
+        // walk the path by distance, cutting in small steps so a slow frame never skips hair
+        const segLen = (k) => Math.hypot(path[k + 1][0] - path[k][0], path[k + 1][1] - path[k][1]) || 1;
+        const sub = Math.max(1, Math.ceil(dt * 46 / .5));
+        for (let s = 0; s < sub && seg < path.length - 1; s++) {
+          t += dt * 46 / sub;
+          while (seg < path.length - 1 && t >= segLen(seg)) { t -= segLen(seg); seg++; }
+          if (seg < path.length - 1) { const [ax, ay] = path[seg], [bx, by] = path[seg + 1], f = t / segLen(seg); clip = [ax + (bx - ax) * f, ay + (by - ay) * f]; cut(clip[0], clip[1], 90 * dt / sub); }
+        }
+        if (seg >= path.length - 1) { mode = 'pause'; idle = 0; clip = null; }
       } else if (mode === 'pause') {
         idle += dt; if (idle > 1.4) { mode = 'regrow'; regrow = 0; }
       } else if (mode === 'regrow') {

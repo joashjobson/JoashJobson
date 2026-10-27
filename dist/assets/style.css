@@ -67,7 +67,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .home-link { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
 .home-link .pix { image-rendering: pixelated; background: var(--sunk); }
 .toplinks { display: flex; align-items: center; gap: 4px; }
-.toplinks a { text-decoration: none; color: var(--muted); font-size: 15px; font-weight: 500; padding: 6px 10px; }
+.toplinks a { text-decoration: none; color: var(--muted); font-size: 15px; font-weight: 500; padding: 6px 10px; white-space: nowrap; }
 .toplinks a:hover, .toplinks a[aria-current=page] { color: var(--ink); }
 .toplinks a[aria-current=page] { box-shadow: inset 0 -2px 0 var(--accent); }
 .theme { width: 36px; height: 36px; border: 1px solid transparent; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
@@ -109,6 +109,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .facts > div + div { border-left: 1px solid var(--line); padding-left: 16px; }
 .facts dd { margin: 0; }
 .facts dd:not(.small) { font-family: var(--display); font-weight: 600; font-size: 30px; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.facts dd.fact-text { font-size: 20px; padding-top: 6px; }
 
 /* Donate tile: solid navy, the portrait stands on the bottom edge and runs off the right side */
 .tile.donate { --t-ink: #FFFFFF; --t-soft: #C9CCD1; --t-line: rgba(255, 255, 255, .28);
@@ -302,6 +303,7 @@ input[type=text]:focus, input[type=number]:focus, input[type=password]:focus { b
 .tabs button { font: 600 15px var(--body); background: none; border: 0; color: var(--muted); padding: 8px 0 10px; cursor: pointer; box-shadow: inset 0 -3px 0 transparent; }
 .tabs button[aria-selected=true] { color: var(--ink); box-shadow: inset 0 -3px 0 var(--accent); }
 .boardhead { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.board-title { margin: 0; color: var(--ink); padding: 8px 0 10px; }
 .rows { list-style: none; margin: 0; padding: 0; }
 .rows li { display: grid; grid-template-columns: 26px 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .rows .rank { font-family: var(--pixel); font-size: 13px; color: var(--muted); }
@@ -504,7 +506,8 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
 .note-ded { margin: 0; padding-left: 12px; border-left: 4px solid var(--pop); font-family: var(--display); font-weight: 600; font-size: 16px; letter-spacing: -.01em; }
 .mnote.lime .note-ded { border-left-color: var(--accent); }
 .mnote.paper .note-ded { border-left-color: var(--accent); }
-@media (max-width: 620px) { .wall-filter { display: flex; overflow-x: auto; flex-wrap: nowrap; max-width: 100%; } .wall-filter button { white-space: nowrap; } }
+/* Phones: the filters sit in a 2-column grid so every one shows in full (no sideways scrolling). 1px gaps over the ink draw the lines. */
+@media (max-width: 620px) { .wall-filter { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--ink); width: 100%; } .wall-filter button { background: var(--bg); padding: 11px 8px; line-height: 1.2; } .wall-filter button + button { border-left: 0; } }
 .adm-logo { object-fit: contain; background: #fff; display: block; }
 .adm .label { margin: 24px 0 8px; }
 /* On the home page the top spot is a slim strip, so Joash's intro stays the main thing */
@@ -528,6 +531,8 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
 .ts-cta { background: #BFD6EA; color: #2A2B2D; border-color: #BFD6EA; }
 @media (hover: hover) { .ts-cta:hover { background: transparent; color: #BFD6EA; } }
 @media (max-width: 460px) { .home-link .surname { display: none; } }
+/* Small phones (iPhone SE and similar): tighter top bar so the theme button never pokes past the edge */
+@media (max-width: 360px) { .topbar-in { gap: 6px; } .toplinks { gap: 0; } .toplinks a { padding: 6px 6px; font-size: 14px; } .home-link { gap: 8px; } }
 .cheer .heart { fill: currentColor; fill-opacity: .28; stroke: none; }
 .cheer.on .heart { fill-opacity: 1; }
 .spotform label { position: relative; }
@@ -552,3 +557,12 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
    centred on its ink box, so it doesn't depend on the font loading. Same mark as the tab icons. */
 .jmark { width: 28px; height: 28px; flex: none; display: block; color: var(--ink); }
 .jmark .jm-c { fill: var(--accent); }
+
+/* v17: goes left, on the game's start screen */
+.overlay .goes { margin: 0; font-family: var(--pixel); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.overlay .goes b { color: var(--pop); font-size: 16px; margin-right: 4px; }
+.overlay p a { color: inherit; }
+.overlay p.soft-ask { font-size: 13px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); width: 100%; }
+.overlay p.soft-ask a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.arcade .overlay p.soft-ask a { color: var(--accent2); }
+.overlay p.dare { color: var(--ink); font-weight: 600; }

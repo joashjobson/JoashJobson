@@ -4,7 +4,7 @@
   const $ = (s) => document.querySelector(s);
   let pw = '';
   try { pw = sessionStorage.getItem('jj-admin') || ''; } catch (_) { /* no storage */ }
-  let tab = 'ok';
+  let tab = 'players';
   const AUD = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 2 });
   const when = (t) => t ? new Date(t).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
 
@@ -85,11 +85,10 @@
   function playerRow(p) {
     const toggle = async (body, done) => { try { await post('player', { player: p.id, ...body }); say(done); load(); } catch (e) { say(e.message, true); } };
     return el('tr', { class: p.hidden ? 'hidden' : '' },
-      el('td', {}, p.name || 'Anonymous'), el('td', {}, AUD.format(p.donated)), el('td', {}, p.best == null ? '—' : p.best.toFixed(2) + 's'),
-      el('td', {}, String(Math.max(0, p.tokens))),
+      el('td', {}, p.name || 'Anonymous'), el('td', {}, p.best == null ? '—' : p.best.toFixed(2) + 's'),
       el('td', {}, el('button', { class: 'textlink', type: 'button', onclick: () => toggle({ hidden: !p.hidden }, p.hidden ? 'Shown on the leaderboard again.' : 'Hidden from the leaderboard.') }, p.hidden ? 'Show' : 'Hide'),
         ' ', p.best != null && el('button', { class: 'textlink', type: 'button', onclick: () => confirm('Clear their best time?') && toggle({ clearTime: true }, 'Time cleared.') }, 'Clear time'),
-        ' ', el('button', { class: 'textlink', type: 'button', onclick: () => confirm("Delete everything about this person? Their name, avatar, times, tokens and receipt details go for good. This can't be undone.") && toggle({ remove: true }, 'Deleted.') }, 'Delete')));
+        ' ', el('button', { class: 'textlink', type: 'button', onclick: () => confirm("Delete everything about this person? Their name, avatar and times go for good. This can't be undone.") && toggle({ remove: true }, 'Deleted.') }, 'Delete')));
   }
 
   // Top spot posts and messages: both go up automatically once the checker passes them; Joash can take any down
@@ -116,13 +115,12 @@
       $('#queue').textContent = '';
       if (tab === 'posts') {
         const d = await (await api('posts')).json();
-        list.replaceChildren(el('h2', { class: 'label' }, 'The top spot'), postTable('spot', d.spots, 'Nobody has taken the top spot yet.'),
-          el('h2', { class: 'label' }, 'Messages'), postTable('message', d.messages, 'No messages yet.'));
+        list.replaceChildren(el('h2', { class: 'label' }, 'Messages'), postTable('message', d.messages, 'No messages yet.'));
       } else if (tab === 'players') {
         const people = await (await api('players')).json();
         list.replaceChildren(people.length
-          ? el('table', { class: 'adm-table' }, el('thead', {}, el('tr', {}, ['Name', 'Donated', 'Best', 'Tokens left', ''].map(h => el('th', {}, h)))), el('tbody', {}, people.map(playerRow)))
-          : el('p', { class: 'empty' }, 'Nobody has donated or played a ranked run yet.'));
+          ? el('table', { class: 'adm-table' }, el('thead', {}, el('tr', {}, ['Name', 'Best', ''].map(h => el('th', {}, h)))), el('tbody', {}, people.map(playerRow)))
+          : el('p', { class: 'empty' }, 'Nobody has played a ranked run yet.'));
       } else {
         const [rs, q] = await Promise.all([api('receipts?status=' + tab).then(r => r.json()), api('queue').then(r => r.json())]);
         $('#queue').textContent = q.queued ? `${q.queued} receipt${q.queued === 1 ? ' is' : 's are'} waiting in the queue because the receipt checker was busy. They'll be checked automatically.` : '';

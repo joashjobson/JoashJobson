@@ -339,7 +339,7 @@ function buildHead(look) {
   return { kind, max, weight, base, under, totalW, ramp: full.hairRamp };
 }
 
-// The head being shaved. Ranked runs and practice always use Joash; "Shave your avatar" swaps in the player's look.
+// The head being shaved. Ranked runs always use Joash; "Shave your avatar" swaps in the player's look.
 let HEAD, COL;
 function useHead(look) {
   HEAD = buildHead(look);
@@ -423,7 +423,7 @@ async function shareRun(run) {
   const c = await makeShareCard(run);
   const blob = await new Promise(r => c.toBlob(r, 'image/png'));
   const file = new File([blob], 'my-shave-time.png', { type: 'image/png' });
-  const text = `I shaved ${run.mode === 'own' ? 'my own' : "Joash's"} pixel head in ${fmtTime(run.secs)}s for World's Greatest Shave. Beat my time: https://${siteHost()}/shave`;
+  const text = `I shaved ${run.mode === 'own' ? 'my own' : "Joash's"} pixel head in ${fmtTime(run.secs)}s for World's Greatest Shave. Bet you can't beat it: https://${siteHost()}/shave`;
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], text }); return 'shared'; }
     catch (e) { if (e.name === 'AbortError') return 'cancelled'; }
@@ -434,7 +434,6 @@ async function shareRun(run) {
   try { await navigator.clipboard.writeText(text); } catch (_) { /* no clipboard */ }
   return 'downloaded';
 }
-const AUD = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 });
 const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- Avatar maker: preset parts only, so nothing needs moderating ---------- */
@@ -474,11 +473,11 @@ function AvatarMaker({ look, onChange }) {
 }
 
 /* ---------- 1. Pixel-shaving game ---------- */
-function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onWin, playerName, look, savedBest }) {
+function ShaveGame({ goes = 0, onStart, onWin, playerName, look, savedBest }) {
   const stageRef = useRef(null), canvasRef = useRef(null);
   const G = useRef(null);
   const [phase, setPhase] = useState('idle');    // idle | playing | won
-  const [mode, setMode] = useState('practice');  // practice | ranked
+  const [mode, setMode] = useState('ranked');  // ranked | own
   const [hud, setHud] = useState({ t: 0, pct: 0, eff: 1 });
   const [best, setBest] = useState(null);
   const [result, setResult] = useState(null);
@@ -505,12 +504,11 @@ function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onW
     setHud({ t: 0, pct: 0, eff: 1 });
   }
 
-  // One token buys a ranked run on Joash plus a run on your own avatar. Everyone also gets one free run (practice or their own avatar).
-  const canRanked = rankedLeft > 0 || tokens > 0, canOwn = freeLeft || ownLeft > 0 || tokens > 0;
+  // Each run uses a go: everyone gets two free, and each message posted earns two more.
+  // Ranked runs on Joash can go on the board, runs on your own avatar are just for fun.
   async function start(m) {
-    if (busy) return;
+    if (busy || goes < 1) return;
     if (m === 'own' && !hasHair(look)) return;
-    if ((m === 'ranked' && !canRanked) || (m === 'own' && !canOwn)) return;
     setBusy(true); setErr('');
     let run;
     try { run = await onStart(m); }
@@ -662,16 +660,16 @@ function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onW
           <div class="overlay"><div class="box">
             <p class="blink" aria-hidden="true">Press start</p>
             <h4>Ready to <em>shave?</em></h4>
-            <p>Hold and drag to run the clippers. One token gets you a ranked run on Joash, which can go on the board, plus a run on your own avatar.${freeLeft ? ' Your first run is free, on Joash or your own avatar.' : ''}</p>
+            <p>Hold and drag to run the clippers. Your best time on Joash goes on the board.</p>
+            <p class="goes"><b>${goes}</b> ${goes === 1 ? 'go' : 'goes'} left</p>
             <div class="btns">
-              <button class="btn hot" id="play-ranked" disabled=${!canRanked || busy} onClick=${() => start('ranked')}>Ranked run · ${rankedLeft > 0 ? 'paid' : '1 token'}</button>
-              ${freeLeft && html`<button class="btn ghost" id="play-practice" disabled=${busy} onClick=${() => start('practice')}>Free practice</button>`}
-              <button class="btn ghost" id="play-own" disabled=${!hasHair(look) || busy || !canOwn} onClick=${() => start('own')}>Shave your avatar · ${freeLeft ? 'free' : ownLeft > 0 ? 'paid' : '1 token'}</button>
+              ${goes < 1
+                ? html`<a class="btn hot" id="earn-goes" href=${PAGES.messages}>Leave a message</a>`
+                : html`<button class="btn hot" id="play-ranked" disabled=${busy} onClick=${() => start('ranked')}>Shave Joash</button>
+              <button class="btn ghost" id="play-own" disabled=${!hasHair(look) || busy} onClick=${() => start('own')}>Shave your avatar</button>`}
             </div>
-            ${!hasHair(look) && html`<p>Your avatar is already bald. Pick a hairstyle to shave it.</p>`}
-            ${rankedLeft > 0 && html`<p>You've got a ranked run on Joash already paid for.</p>`}
-            ${ownLeft > 0 && html`<p>You've got a run on your own avatar already paid for.</p>`}
-            ${!canRanked && html`<p>${freeLeft ? 'Upload a receipt to earn tokens for ranked runs.' : "You've used your free run. Upload a receipt to earn tokens."}</p>`}
+            ${goes < 1 && html`<p>You're out of goes. Each message of support you post earns 2 more.</p>`}
+            ${goes > 0 && !hasHair(look) && html`<p>Your avatar is already bald. Pick a hairstyle to shave it.</p>`}
             ${err && html`<p class="err" role="alert">${err}</p>`}
           </div></div>`}
         ${phase === 'won' && result && html`
@@ -689,17 +687,18 @@ function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onW
               </form>`}
             ${err && html`<p class="err" role="alert">${err}</p>`}
             ${mode === 'ranked' && submitted && html`<p>Your time is on the Fastest Shavers board.</p>`}
-            ${mode === 'practice' && html`<p>Practice runs don't go on the board.</p>`}
             ${mode === 'own' && html`<p>Just for fun. Avatar runs don't go on the board, because every hairstyle has a different amount of hair.</p>`}
+            <p class="dare">Send your time to friends and dare them to beat it.</p>
             <div class="btns">
-              <button class="btn hot" id="share-run" onClick=${async () => { setShareNote('Making your picture…'); const r = await shareRun({ secs: result.secs, mode, hp: G.current.hp, look }).catch(() => 'failed'); setShareNote(r === 'downloaded' ? 'Saved the picture, and copied a caption with the link. Post it to your story!' : r === 'failed' ? "That didn't work. Try again." : ''); }}>Share my time</button>
+              <button class="btn hot" id="share-run" onClick=${async () => { setShareNote('Making your picture…'); const r = await shareRun({ secs: result.secs, mode, hp: G.current.hp, look }).catch(() => 'failed'); setShareNote(r === 'downloaded' ? 'Saved the picture and copied a message with the link. Send it to your friends or post it on your story!' : r === 'failed' ? "That didn't work. Try again." : ''); }}>Challenge a friend</button>
               <button class="btn ghost" onClick=${() => { setShareNote(''); quit(); }}>Play again</button>
             </div>
             ${shareNote && html`<p role="status">${shareNote}</p>`}
+            <p class="soft-ask">Enjoyed it? Joash is raising money for people living with blood cancer. If you'd like, you can <a href=${FUNDRAISER.url} target="_blank" rel="noopener">donate to his fundraiser</a>.</p>
           </div></div>`}
       </div>
       <div class="gamebar">
-        <span class="modechip">1P · ${phase === 'playing' ? (mode === 'ranked' ? 'Ranked run · Joash' : mode === 'own' ? 'Your avatar · for fun' : 'Practice · Joash') : 'Ranked runs are always on Joash'}</span>
+        <span class="modechip">1P · ${phase === 'playing' ? (mode === 'own' ? 'Your avatar · for fun' : 'Ranked run · Joash') : 'Ranked runs are always on Joash'}</span>
         ${phase === 'playing' && html`<button class="linkbtn" onClick=${quit}>Quit run</button>`}
       </div>
       <ul class="rules">
@@ -710,142 +709,24 @@ function ShaveGame({ tokens, freeLeft, rankedLeft = 0, ownLeft = 0, onStart, onW
     </div>`;
 }
 
-// Send a small JPEG (long edge 1024px) so each receipt uploads fast and stays within the receipt checker's free limits.
-function shrinkReceipt(file, maxEdge = 1024) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, maxEdge / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
-      c.toBlob(b => b ? resolve(b) : reject(new Error('shrink failed')), 'image/jpeg', 0.8);
-    };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
-  });
-}
-const AUD2 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-
-// Screenshots and photos are shrunk to a small JPEG. The receipt checker reads images only, so PDFs are turned away here.
-async function prepareReceipt(file) {
-  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')) throw new Error("PDFs can't be read. Open the receipt and upload a screenshot of it instead.");
-  if (!/^image\//.test(file.type) && !/\.(heic|heif)$/i.test(file.name || '')) throw new Error('Choose a screenshot of your receipt.');
-  try { return await shrinkReceipt(file); }
-  catch (_) { throw new Error("This browser can't open that photo. Upload a screenshot of the receipt instead."); }
-}
-
-// Tokens: total donated divided by the token price, rounded to the nearest whole token (so $29 is 1 and $31 is 2).
-const tokensFor = (dollars, price) => Math.floor(dollars / price + 0.5);
-
-function Tokens({ me, price }) {
-  const earned = tokensFor(me.donated, price);
-  const toNext = (earned + 0.5) * price - me.donated;
-  return html`
-    <p class="tokbar" id="token-count">
-      <span class="coin" aria-hidden="true"></span>
-      <span>You have <b>${me.tokens}</b> token${me.tokens === 1 ? '' : 's'}</span>
-      <span class="next">${me.donated === 0 ? `Donate $${price / 2} or more to earn your first.` : `${AUD2.format(me.donated)} donated. ${AUD2.format(toNext)} more earns the next one.`}</span>
-      ${me.freeLeft && html`<span class="next">You also have 1 free run.</span>`}
-      ${(me.rankedLeft > 0 || me.ownLeft > 0) && html`<span class="next">Plus ${me.rankedLeft > 0 ? 'a ranked run' : 'an avatar run'} already paid for.</span>`}
-    </p>`;
-}
-
-const STATUS = { ok: ['Added', 'ok'], pending: ['In the queue', 'wait'], rejected: ['Not accepted', 'no'] };
-function resultText(r) {
-  if (r.status === 'ok') return `Added ${AUD2.format(r.amount)}${r.name ? ' from ' + r.name.replace(/\.$/, '') : ''}. You now have ${r.tokens} token${r.tokens === 1 ? '' : 's'}.`;
-  if (r.status === 'pending') return "The receipt checker is busy, so your receipt is in the queue. It'll be checked automatically in the next few minutes and your tokens will show up here.";
-  return r.reason || "This receipt wasn't accepted.";
-}
-
-function ReceiptUpload({ onUpload, receipts }) {
-  const [state, setState] = useState({ phase: 'idle' });   // idle | checking | done | error
-  const [over, setOver] = useState(false);
-  const [pv, setPv] = useState({ amount: '25', to: 'joash' });   // preview only: stands in for what the receipt checker reads
-  const fileRef = useRef(null);
-  const busy = state.phase === 'checking';
-  const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-
-  const handle = async (file) => {
-    if (!file || busy) return;
-    setState({ phase: 'checking' });
-    try {
-      const blob = await prepareReceipt(file);
-      const result = await onUpload(blob, file.name || 'receipt.png', pv);
-      setState({ phase: 'done', result });
-    } catch (e) { setState({ phase: 'error', msg: e.message }); }
-    if (fileRef.current) fileRef.current.value = '';
-  };
-  // Once a queued receipt has been checked, say how it went instead of "in the queue"
-  let shown = state.phase === 'done' ? { status: state.result.status, text: resultText(state.result) } : null;
-  if (shown && shown.status === 'pending' && receipts[0] && receipts[0].status !== 'pending') {
-    const last = receipts[0];
-    shown = last.status === 'ok'
-      ? { status: 'ok', text: `Your receipt from the queue has been checked and ${AUD2.format(last.amount)} was added.` }
-      : { status: 'rejected', text: `Your receipt from the queue wasn't accepted. ${last.reason || ''}`.trim() };
-  }
-  // Paste a screenshot anywhere on the page (Ctrl+V or Cmd+V)
-  const handleRef = useRef(handle); handleRef.current = handle;
-  useEffect(() => {
-    const onPaste = (e) => { const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0]; if (f) { e.preventDefault(); handleRef.current(f); } };
-    window.addEventListener('paste', onPaste);
-    return () => window.removeEventListener('paste', onPaste);
-  }, []);
-
-  return html`
-    <div class="stepform">
-      <label class=${'drop big' + (over ? ' over' : '') + (busy ? ' busy' : '')} for="receipt-file"
-        onDragOver=${e => { e.preventDefault(); setOver(true); }} onDragLeave=${() => setOver(false)}
-        onDrop=${e => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files[0]); }}>
-        <span class="drop-icon" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="drop-main">${busy ? 'Checking your receipt…' : touch ? 'Tap to add your receipt' : 'Add your receipt screenshot'}</span>
-        <span class="drop-sub">${busy ? 'This takes a few seconds.' : touch ? 'Pick the screenshot straight from your photos.' : `Click to choose it, drag it here, or paste it with ${IS_MAC ? '⌘V' : 'Ctrl+V'}.`}</span>
-        <input id="receipt-file" ref=${fileRef} type="file" accept="image/*" disabled=${busy} onChange=${e => handle(e.target.files[0])} />
-      </label>
-      ${state.phase === 'done' && html`<p class=${'result ' + shown.status} role="status">${shown.text}</p>`}
-      ${state.phase === 'error' && html`<p class="err" role="alert">${state.msg}</p>`}
-      ${PREVIEW && html`
-        <p class="pvbar">
-          <span>Preview only: there's no receipt checker here, so pretend the receipt is</span>
-          <select aria-label="Who the pretend donation went to" value=${pv.to} onChange=${e => setPv({ ...pv, to: e.target.value })}>
-            <option value="joash">for Joash</option><option value="other">for someone else</option><option value="blurry">too blurry to read</option><option value="fake">fake</option><option value="busy">sent while the checker is busy</option>
-          </select>
-          <span>for $</span><input aria-label="Pretend amount" type="number" min="1" step="1" value=${pv.amount} onInput=${e => setPv({ ...pv, amount: e.target.value })} />
-        </p>`}
-      ${receipts.length > 0 && html`
-        <ul class="receipts" aria-label="Your receipts">
-          ${receipts.map((r, i) => html`<li key=${i}>
-            <span>${r.amount != null ? AUD2.format(r.amount) : 'Receipt'} · ${new Date(r.when).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
-            <span class=${'chip ' + STATUS[r.status][1]} title=${r.reason || ''}>${STATUS[r.status][0]}</span>
-          </li>`)}
-        </ul>`}
-    </div>`;
-}
-
 /* ---------- Leaderboards ---------- */
 function Leaderboard({ boards, sample }) {
-  const [tab, setTab] = useState('donors');
-  const rows = tab === 'donors' ? boards.donors : boards.shavers;
-  const keyTab = (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') setTab(tab === 'donors' ? 'shavers' : 'donors'); };
+  const rows = boards.shavers;
   return html`
     <div class="board">
       <div class="boardhead">
-        <div class="tabs" role="tablist" onKeyDown=${keyTab}>
-          <button role="tab" id="tab-donors" aria-selected=${tab === 'donors'} tabIndex=${tab === 'donors' ? 0 : -1} onClick=${() => setTab('donors')}>Top Donors</button>
-          <button role="tab" id="tab-shavers" aria-selected=${tab === 'shavers'} tabIndex=${tab === 'shavers' ? 0 : -1} onClick=${() => setTab('shavers')}>Fastest Shavers</button>
-        </div>
+        <h3 class="board-title label">Fastest Shavers</h3>
         ${sample && html`<span class="chip sample">Sample entries</span>`}
       </div>
       ${rows.length === 0
-        ? html`<p class="empty">${tab === 'donors' ? 'No donations yet. Yours could be the first.' : 'No ranked times yet. Be the first on the board.'}</p>`
-        : html`<ol class="rows" role="tabpanel" aria-labelledby=${'tab-' + tab}>
+        ? html`<p class="empty">No ranked times yet. Be the first on the board.</p>`
+        : html`<ol class="rows">
           ${rows.map((r, i) => html`
-            <li key=${tab + i} class=${r.me ? 'me' : ''}>
+            <li key=${i} class=${r.me ? 'me' : ''}>
               <span class="rank">${String(i + 1).padStart(2, '0')}</span>
               <${PixelAvatar} look=${r.look} size=${40} label=${r.name + "'s avatar"} />
               <span class="who">${r.name}${r.me && html`<span class="youtag">YOU</span>`}</span>
-              <span class="val">${tab === 'donors' ? AUD.format(r.amount) : fmtTime(r.secs) + 's'}</span>
+              <span class="val">${fmtTime(r.secs) + 's'}</span>
             </li>`)}
         </ol>`}
     </div>`;
@@ -858,105 +739,6 @@ function MiniBoard({ id, title, rows, val, none, sample }) {
       ${rows.length === 0 ? html`<p class="empty">${none}</p>` : html`<ol class="mini">${rows.slice(0, 3).map((r, i) => html`
         <li key=${i} class=${r.me ? 'me' : ''}><span class="rank">${i + 1}</span><${PixelAvatar} look=${r.look} size=${32} label=${r.name + "'s avatar"} /><span class="who">${r.name}</span><span class="val">${val(r)}</span></li>`)}</ol>`}
       <a class="tile-more" href=${PAGES.shave + (PREVIEW ? '' : '#board')}>Full leaderboard</a>
-    </section>`;
-}
-
-/* ---------- The top spot: a banner anyone can take by outbidding the donation showing ---------- */
-const siteName = (link) => (link || '').replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
-function TopSpot({ spot, sample, draft, cta = true }) {
-  const s = draft || (spot && spot.current);
-  const needed = spot ? spot.needed : 20;
-  return html`
-    <section class=${'topspot' + (s && s.kind === 'business' ? ' biz' : '') + (draft ? ' draft' : '')} aria-label="The top spot">
-      <div class="ts-head">
-        <span class="label">The top spot</span>
-        ${s && s.kind === 'business' && html`<span class="chip">Sponsored</span>`}
-        ${sample && !draft && html`<span class="chip">Sample</span>`}
-      </div>
-      ${s ? html`
-        <div class="ts-body">
-          ${s.logo && html`<img class="ts-logo" src=${s.logo} alt=${s.name + ' logo'} width="56" height="56" />`}
-          <div class="ts-text">
-            <p class="ts-msg">${s.message || 'Your message goes here.'}</p>
-            <p class="ts-by"><b>${s.name || 'Your name'}</b> · ${AUD.format(s.amount || needed)}${s.link && html` · <a href=${s.link} target="_blank" rel="sponsored nofollow noopener">${s.site || siteName(s.link)} ↗</a>`}</p>
-          </div>
-        </div>`
-      : html`<div class="ts-body"><p class="ts-msg">Nobody holds the top spot yet. Your message, or your business, could be here.</p></div>`}
-      ${!draft && cta && html`<a class="ts-cta" href=${PAGES.shave + (PREVIEW ? '' : '#spot')}>${s ? `Outbid: donate ${AUD.format(needed)}+` : `Donate ${AUD.format(needed)}+ to take it`}</a>`}
-    </section>`;
-}
-
-// Shrinks a logo to fit 160px, as PNG, so it stays small
-function shrinkLogo(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file), img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, 160 / Math.max(img.width, img.height)), c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-      const out = c.toDataURL('image/png');
-      out.length > 100000 ? resolve(c.toDataURL('image/webp', .85)) : resolve(out);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That image couldn't be opened. Try a PNG or JPG.")); };
-    img.src = url;
-  });
-}
-
-function SpotStep({ me, spot, sample, onClaim }) {
-  const [kind, setKind] = useState('person');
-  const [f, setF] = useState({ name: '', message: '', link: '', logo: null });
-  const [busy, setBusy] = useState(false), [err, setErr] = useState(''), [done, setDone] = useState(false);
-  useEffect(() => { setF(x => ({ ...x, name: x.name || (kind === 'person' ? me.name : '') })); }, [me.name, kind]);
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const step = spot ? spot.step : 5, needed = spot ? spot.needed : 20, past = spot ? spot.past : [];
-  const pickLogo = async (e) => { const file = e.target.files[0]; if (!file) return; try { setF({ ...f, logo: await shrinkLogo(file) }); setErr(''); } catch (x) { setErr(x.message); } };
-  const submit = async (e) => {
-    e.preventDefault(); if (busy) return;
-    setBusy(true); setErr('');
-    try { await onClaim({ receipt: me.spot.receipt, kind, name: f.name, message: f.message, link: kind === 'business' ? f.link : '', logo: kind === 'business' ? f.logo : null }); setDone(true); setF({ name: '', message: '', link: '', logo: null }); }
-    catch (x) { setErr(x.message); }
-    setBusy(false);
-  };
-  const draft = me.spot && { kind, name: f.name, message: f.message, link: kind === 'business' && f.link ? f.link : null, site: siteName(f.link), amount: me.spot.amount, logo: kind === 'business' ? f.logo : null };
-  return html`
-    <section class="step" id="spot" aria-labelledby="step-6">
-      <h2 class="step-h" id="step-6"><span class="step-n">06</span>Take the top spot</h2>
-      <ul class="points">
-        <li><span>The top of my home page shows one message, from a person or a business. To take it, donate <strong>${AUD.format(needed)} or more in one go</strong> (${AUD.format(step)} more than the donation showing now) and upload the receipt in step 2.</span></li>
-        <li><span>Write up to 100 characters. A business can add its name, logo and website.</span></li>
-        <li><span>It stays there until someone outbids you, and every message that held the spot is kept below. Your donation still earns tokens too.</span></li>
-        <li><span>Messages are checked automatically. Anything rude, hateful or spammy is turned down.</span></li>
-      </ul>
-      <${TopSpot} spot=${spot} sample=${sample} cta=${false} />
-      ${done && html`<p class="result ok" role="status">You've got the top spot. It's on the home page now.</p>`}
-      ${me.spot ? html`
-        <form class="spotform" onSubmit=${submit}>
-          <div class="seg" role="radiogroup" aria-label="Who it's from">
-            <button type="button" role="radio" id="spot-person" aria-checked=${kind === 'person'} onClick=${() => setKind('person')}>From me</button>
-            <button type="button" role="radio" id="spot-business" aria-checked=${kind === 'business'} onClick=${() => setKind('business')}>From a business</button>
-          </div>
-          <label for="spot-name">${kind === 'business' ? 'Business name' : 'Your name'}
-            <input id="spot-name" type="text" maxlength="40" value=${f.name} onInput=${set('name')} required=${kind === 'business'} placeholder=${kind === 'business' ? 'Northside Bakery' : 'Shown as written'} /></label>
-          <label for="spot-msg">Message <span class="count">${f.message.length}/100</span>
-            <input id="spot-msg" type="text" maxlength="100" value=${f.message} onInput=${set('message')} required placeholder=${kind === 'business' ? 'What you do, in a line' : 'For someone, or for everyone'} /></label>
-          ${kind === 'business' && html`
-            <div class="row2">
-              <label for="spot-link">Website <input id="spot-link" type="text" inputmode="url" maxlength="200" value=${f.link} onInput=${set('link')} placeholder="yourbusiness.com.au" /></label>
-              <label for="spot-logo">Logo (optional) <input id="spot-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange=${pickLogo} /></label>
-            </div>`}
-          <p class="label">Preview</p>
-          <${TopSpot} draft=${draft} spot=${spot} />
-          ${err && html`<p class="err" role="alert">${err}</p>`}
-          <button class="pbtn" type="submit" id="spot-submit" disabled=${busy}>${busy ? 'Checking your message…' : `Take the top spot with ${AUD.format(me.spot.amount)}`}</button>
-        </form>`
-      : html`<p class="note">${me.donated > 0 ? `Your biggest donation isn't enough to outbid the top spot yet. A new donation of ${AUD.format(needed)} or more would take it.` : `Upload a receipt for ${AUD.format(needed)} or more in step 2 and you can write your message here.`}${sample ? ` In this preview, set the pretend amount in step 2 to ${AUD.format(needed)} or more to try it.` : ''}</p>`}
-      ${past.length > 0 && html`
-        <div class="past">
-          <h3 class="label">Held the top spot before</h3>
-          <ol class="past-list">${past.map(s => html`
-            <li key=${s.id}>${s.logo ? html`<img src=${s.logo} alt="" width="28" height="28" />` : html`<span class="past-dot" aria-hidden="true"></span>`}
-              <p><span class="past-msg">${s.message}</span><span class="past-by">${s.name} · ${AUD.format(s.amount)}${s.link && html` · <a href=${s.link} target="_blank" rel="sponsored nofollow noopener">${s.site}</a>`}</span></p></li>`)}</ol>
-        </div>`}
     </section>`;
 }
 
@@ -974,18 +756,20 @@ const PROMPTS = [
 const promptOf = (k) => PROMPTS.find(p => p.key === k);
 const dedText = (d) => d && (d.kind === 'memory' ? 'In memory of ' : 'In honour of ') + d.name;
 
-function Messages({ api, me }) {
+function Messages({ api, me, onPosted }) {
   const [list, setList] = useState(null), [err, setErr] = useState(''), [loadErr, setLoadErr] = useState(false);
-  const [name, setName] = useState(''), [text, setText] = useState(''), [busy, setBusy] = useState(false), [fresh, setFresh] = useState(null);
+  const [name, setName] = useState(''), [text, setText] = useState(''), [busy, setBusy] = useState(false), [fresh, setFresh] = useState(null), [earned, setEarned] = useState(0);
   const [prompt, setPrompt] = useState(null), [ded, setDed] = useState(''), [dedName, setDedName] = useState(''), [filter, setFilter] = useState('all');
   useEffect(() => { api.messages().then(d => setList(d.messages), () => setLoadErr(true)); }, []);
   useEffect(() => { setName(n => n || me.name); }, [me.name]);
   const post = async (e) => {
     e.preventDefault(); if (busy) return;
-    setBusy(true); setErr('');
+    setBusy(true); setErr(''); setEarned(0);
     try {
       const d = await api.postMessage({ name: name.trim(), text: text.trim(), prompt, dedKind: ded || null, dedName: ded ? dedName.trim() : '' });
       setList(d.messages); setFresh(d.messages[0] && d.messages[0].id); setText(''); setDed(''); setDedName(''); setFilter('all');
+      if (d.me) onPosted(d);
+      setEarned(d.earned || 0);
     }
     catch (x) { setErr(x.message); }
     setBusy(false);
@@ -995,7 +779,7 @@ function Messages({ api, me }) {
     <div class="msgs">
       <header class="msgs-head">
         <h1 class="name">Leave a <em>message.</em></h1>
-        <p class="lede">For someone you love who's been through cancer, for anyone going through it now, or for everyone donating. No donation needed.</p>
+        <p class="lede">For someone you love who's been through cancer, for anyone going through it now, or for everyone donating. No donation needed, and each message earns you 2 goes at the <a class="textlink" href=${PAGES.shave + (PREVIEW ? '' : '#step-shave')}>shave game</a>.</p>
       </header>
       <form class="composer" onSubmit=${post}>
         <${PixelAvatar} look=${me.look} size=${56} label="Your avatar" className="composer-av" />
@@ -1019,6 +803,7 @@ function Messages({ api, me }) {
             <button class="pbtn" type="submit" id="msg-post" disabled=${busy || !text.trim() || !name.trim()}>${busy ? 'Checking…' : 'Post'}</button>
           </div>
           ${err && html`<p class="err" role="alert">${err}</p>`}
+          ${earned > 0 && html`<p class="result ok" role="status">Posted! You earned ${earned} goes at the shave game. <a class="textlink" href=${PAGES.shave + (PREVIEW ? '' : '#step-shave')}>Play now</a></p>`}
         </div>
       </form>
       ${loadErr && html`<p class="err">Messages couldn't load just now. Refresh the page to try again.</p>`}
@@ -1237,7 +1022,6 @@ function MessageVideo({ api, config }) {
 
 /* ---------- The shave page ---------- */
 function WgsFundraiserSection({ me, boards, config, actions }) {
-  const price = config.tokenPrice;
   const [nameDraft, setNameDraft] = useState(me.name);
   useEffect(() => { setNameDraft(me.name); }, [me.name]);
   const saveName = () => { const n = nameDraft.trim(); if (n && n !== me.name) actions.setName(n).catch(() => setNameDraft(me.name)); };
@@ -1249,17 +1033,17 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
       <header class="shave-head">
         <p class="label">World's Greatest Shave</p>
         <h1 class="name">How fast can you shave my <em>pixel head?</em></h1>
-        <p class="lede">I'm raising money for World's Greatest Shave to support people living with blood cancer. Every $${price} you donate gets you a timed go at shaving the pixel version of me, plus a go at shaving your own avatar.</p>
+        <p class="lede">I'm raising money for World's Greatest Shave to support people living with blood cancer. Please donate on my WGS page, then leave a message of support to earn goes at shaving the pixel version of me.</p>
         <dl class="facts">
-          <div><dt class="label">Donated here</dt><dd>${AUD.format(config.raised || 0)}</dd><dd class="small">${config.donors ? `from ${config.donors} ${config.donors === 1 ? 'person' : 'people'}` : 'Be the first'}</dd></div>
           <div><dt class="label">Record</dt><dd>${boards.shavers[0] ? fmtTime(boards.shavers[0].secs) + 's' : '–'}</dd><dd class="small">${boards.shavers[0] ? boards.shavers[0].name : 'No times yet'}</dd></div>
+          <div><dt class="label">Donations go to</dt><dd class="fact-text">Leukaemia Foundation</dd><dd class="small">through World's Greatest Shave</dd></div>
         </dl>
         <div class="head-ctas">
           <a class="pbtn" href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a>
           <button type="button" class="textlink" onClick=${toGame}>Skip to the game</button>
         </div>
         <ol class="stepnav" aria-label="Steps">
-          ${[['step-1', 'Donate'], ['step-2', 'Upload your receipt'], ['step-3', 'Make your avatar'], ['step-4', 'Shave'], ['step-5', 'Leaderboard'], ['spot', 'Take the top spot']].map(([id, t], i) =>
+          ${[['step-1', 'Donate'], ['step-2', 'Leave a message'], ['step-3', 'Make your avatar'], ['step-4', 'Shave'], ['step-5', 'Leaderboard']].map(([id, t], i) =>
             html`<li key=${id}><a href=${'#' + id} onClick=${e => { e.preventDefault(); document.getElementById(id).closest('section').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth' }); }}><span>0${i + 1}</span>${t}</a></li>`)}
         </ol>
       </header>
@@ -1268,9 +1052,8 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
       <section class="step" aria-labelledby="step-1">
         <h2 class="step-h" id="step-1"><span class="step-n">01</span>Donate on my WGS page</h2>
         <ul class="points">
-          <li><span>Open ${donate} and give any amount. Donations go to the Leukaemia Foundation.</span></li>
-          <li><span>Every <strong>$${price} AUD</strong> earns you one token, rounded to the nearest token. $${price * 1.5 - 1} gets you one token and $${price * 1.5 + 1} gets you two.</span></li>
-          <li><span>World's Greatest Shave emails you a receipt straight away. Keep it for the next step.</span></li>
+          <li><span>Open ${donate} and give any amount. Every dollar helps, and donations go to the Leukaemia Foundation.</span></li>
+          <li><span>Your donation stays between you and World's Greatest Shave. This site never asks how much you gave.</span></li>
         </ul>
         <div class="donate-row">
           <a class="donate-url" href=${FUNDRAISER.url} target="_blank" rel="noopener">${FUNDRAISER.url.replace(/^https?:\/\/(www\.)?/, '')} ↗</a>
@@ -1278,28 +1061,24 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
       </section>
 
       <section class="step" aria-labelledby="step-2">
-        <h2 class="step-h" id="step-2"><span class="step-n">02</span>Upload your receipt</h2>
+        <h2 class="step-h" id="step-2"><span class="step-n">02</span>Leave a message, earn goes</h2>
         <ul class="points">
-          <li><span>Screenshot the receipt email or the thank-you page. Make sure <strong>my name, the amount and the receipt number</strong> are in the shot.</span></li>
-          <li><span>Add it below. On a phone, tap the box and pick the screenshot from your photos. On a computer, drag it in or paste it. There's nothing to type.</span></li>
-          <li><span>It's checked automatically in a few seconds to make sure it's a real receipt for a donation to my page, then your tokens are added. Each receipt only counts once.</span></li>
-          <li><span>If the checker is busy, your receipt waits in a queue and is checked automatically a few minutes later. You don't need to do anything.</span></li>
-          <li><span>If it isn't accepted, you'll see why straight away. Usually a clearer screenshot of the whole receipt fixes it.</span></li>
+          <li><span>Everyone gets <strong>two free goes</strong>. Each message of support you post earns <strong>two more</strong>.</span></li>
+          <li><span>Write something real: some encouragement, a memory, or why you're backing the shave. Messages like "hi" don't go up and don't earn goes.</span></li>
+          <li><span>You can post up to 2 messages a day.</span></li>
         </ul>
-        <${Tokens} me=${me} price=${price} />
-        <${ReceiptUpload} receipts=${me.receipts} onUpload=${actions.upload} />
-        ${me.spot && html`<p class="result ok spot-hint">Your ${AUD.format(me.spot.amount)} donation is big enough to take the top spot on the home page. <a class="textlink" href="#spot" onClick=${e => { e.preventDefault(); document.getElementById('spot').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth' }); }}>Write your message</a></p>`}
+        <div class="donate-row"><a class="pbtn" href=${PAGES.messages}>Leave a message</a></div>
       </section>
 
       <section class="step" aria-labelledby="step-3">
         <h2 class="step-h" id="step-3"><span class="step-n">03</span>Make your avatar</h2>
         <ul class="points">
-          <li><span>Your avatar and name sit next to your entries on both leaderboards.</span></li>
+          <li><span>Your avatar and name sit next to your time on the leaderboard.</span></li>
           <li><span>Use the arrows to pick a hairstyle, hair colour, skin, eyes, face, shirt and an extra, or press Shuffle. Change it whenever you like.</span></li>
         </ul>
         <${AvatarMaker} look=${me.look} onChange=${actions.setLook} />
         <label class="namefield" for="lb-name">Name on the leaderboard
-          <input id="lb-name" type="text" maxlength="24" value=${nameDraft} placeholder="Taken from your receipt if you leave it"
+          <input id="lb-name" type="text" maxlength="24" value=${nameDraft} placeholder="Your name"
             onInput=${e => setNameDraft(e.target.value)} onBlur=${saveName} onKeyDown=${e => { if (e.key === 'Enter') e.target.blur(); }} />
         </label>
       </section>
@@ -1307,24 +1086,21 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
       <section class="step" id="step-shave" aria-labelledby="step-4">
         <h2 class="step-h" id="step-4"><span class="step-n">04</span>Shave my pixel head</h2>
         <ul class="points">
-          <li><span>Each token gets you <strong>two runs</strong>: a ranked run on pixel me, whose time can go on the leaderboard, and a run shaving your own avatar.</span></li>
+          <li><span>Each run uses one go. Your best time shaving pixel me goes on the leaderboard.</span></li>
           <li><span>Hold and drag to run the clippers. On a phone, press and drag with your finger.</span></li>
           <li><span>The clock starts at your first cut and stops when 95% of the hair is gone.</span></li>
-          <li><span>Everyone gets <strong>one free run</strong>, either a practice on me or shaving your own avatar. Free runs don't go on the board.</span></li>
+          <li><span>You can also spend a go shaving your own avatar, just for fun. Those runs don't go on the board.</span></li>
         </ul>
-        <${ShaveGame} tokens=${me.tokens} freeLeft=${me.freeLeft} rankedLeft=${me.rankedLeft} ownLeft=${me.ownLeft} look=${me.look} playerName=${me.name} savedBest=${me.best}
-          onStart=${actions.start} onWin=${actions.finish} />
+        <${ShaveGame} goes=${me.goes} look=${me.look} playerName=${me.name} savedBest=${me.best} onStart=${actions.start} onWin=${actions.finish} />
       </section>
 
       <section class="step" id="board" aria-labelledby="step-5">
         <h2 class="step-h" id="step-5"><span class="step-n">05</span>Climb the leaderboard</h2>
         <ul class="points">
-          <li><span><strong>Fastest Shavers</strong> shows each person's best ranked time.</span></li>
-          <li><span><strong>Top Donors</strong> adds up every receipt you upload.</span></li>
+          <li><span><strong>Fastest Shavers</strong> shows each person's best time on pixel me.</span></li>
         </ul>
         <${Leaderboard} boards=${boards} sample=${config.sample} />
       </section>
-      <${SpotStep} me=${me} spot=${config.spot} sample=${config.sample} onClaim=${actions.claimSpot} />
       </div>
     </div>`;
 }
@@ -1333,7 +1109,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
 // Joash's World's Greatest Shave page. Every donate link on the site uses it.
 const FUNDRAISER = { url: 'https://www.worldsgreatestshave.com/fundraisers/joashj' };
 const START_LOOK = { skin: 2, hair: 1, style: 5, eyes: 2, face: 1, shirt: 1, extra: 0 };
-const EMPTY_ME = { name: '', look: START_LOOK, donated: 0, tokens: 0, freeLeft: true, rankedLeft: 0, ownLeft: 0, best: null, receipts: [], spot: null };
+const EMPTY_ME = { name: '', look: START_LOOK, best: null, goes: 2 };
 
 // No sign-up: each browser gets a random ID the first time, and the Worker saves everything under it.
 function playerId() {
@@ -1358,11 +1134,9 @@ function RemoteAPI() {
   const post = (path, body) => call(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ player, ...body }) });
   return {
     load: () => call('state?player=' + player),
-    upload: (blob, filename) => { const fd = new FormData(); fd.append('player', player); fd.append('file', blob, filename); return call('receipt', { method: 'POST', body: fd }); },
     profile: (p) => post('profile', p),
     start: (mode) => post('run/start', { mode }),
     finish: (o) => post('run/finish', o),
-    claimSpot: (o) => post('spot', o),
     messages: () => call('messages?player=' + player),
     postMessage: (o) => post('message', o),
     cheer: (id) => post('cheer', { id })
@@ -1377,15 +1151,9 @@ const SAMPLE_LOOKS = {
   'Ben K.': { skin: 4, hair: 1, style: 2, eyes: 0, face: 0, shirt: 3, extra: 0 },
   'Mei C.': { skin: 1, hair: 6, style: 6, eyes: 3, face: 1, shirt: 5, extra: 3 }
 };
-const SAMPLE_DONORS = [['Priya S.', 250], ['Tom W.', 180], ['Ana L.', 120], ['Ben K.', 60], ['Mei C.', 40]].map(([name, amount]) => ({ name, amount, look: SAMPLE_LOOKS[name] }));
 const SAMPLE_TIMES = [['Tom W.', 38.42], ['Ana L.', 44.07], ['Priya S.', 51.9], ['Ben K.', 63.15], ['Mei C.', 79.6]].map(([name, secs]) => ({ name, secs, look: SAMPLE_LOOKS[name] }));
 
 const HOUR = 3600000, NOW = Date.now();
-const SAMPLE_SPOTS = [
-  { id: 901, kind: 'person', name: 'Priya S.', message: 'For my dad, three years clear this March. Keep going, Joash!', link: null, site: null, amount: 250, logo: null, when: NOW - 5 * HOUR },
-  { id: 902, kind: 'business', name: 'Northside Bakery', message: 'Fresh sourdough every morning. Proud to back the shave.', link: 'https://example.com', site: 'example.com', amount: 180, logo: null, when: NOW - 30 * HOUR },
-  { id: 903, kind: 'person', name: 'Tom W.', message: 'Beat my time if you can.', link: null, site: null, amount: 120, logo: null, when: NOW - 52 * HOUR }
-];
 const SAMPLE_MESSAGES = [
   ['Ana L.', 'for', 'My nan. She had leukaemia when I was ten and the nurses were incredible. She still talks about them.', 14, 2, ['honour', 'Nan (Rosa)']],
   ['Tom W.', null, 'Donated, played, and beat Mei by two seconds. Worth every cent.', 9, 4],
@@ -1397,11 +1165,8 @@ const SAMPLE_MESSAGES = [
 ].map(([name, prompt, text, cheers, h, ded], i) => ({ id: 800 + i, name, prompt, text, look: SAMPLE_LOOKS[name] || (prompt === 'business' ? null : { skin: 2, hair: 0, style: 2, eyes: 1, face: 4, shirt: 0, extra: 0 }), cheers, cheered: false, when: NOW - h * HOUR, dedication: ded ? { kind: ded[0], name: ded[1] } : null }));
 
 function LocalAPI() {
-  const price = 20;
-  const p = { name: '', look: START_LOOK, cents: 0, spent: 0, freeUsed: false, rankedLeft: 0, ownLeft: 0, bestMs: null, receipts: [], runs: {}, spots: SAMPLE_SPOTS.slice(), used: new Set(), msgs: SAMPLE_MESSAGES.map(m => ({ ...m })) };
+  const p = { name: '', look: START_LOOK, bestMs: null, goes: 2, runs: {}, msgs: SAMPLE_MESSAGES.map(m => ({ ...m })) };
   let nextId = 1;
-  const needed = () => { const c = p.spots[0]; return c ? c.amount + 5 : price; };
-  const spotReceipt = () => { const r = p.receipts.filter(r => r.status === 'ok' && r.amount >= needed() && !p.used.has(r.id)).sort((a, b) => b.amount - a.amount)[0]; return r ? { receipt: r.id, amount: r.amount } : null; };
   const msgs = () => ({ messages: p.msgs.slice() });
   const screen = (t) => {
     if (/badword/i.test(t)) throw new Error("This can't go up. Keep it friendly, with no swearing, hate, adult content, scams or personal details.");
@@ -1409,50 +1174,18 @@ function LocalAPI() {
   };
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   const view = () => {
-    const tokens = Math.max(0, tokensFor(p.cents / 100, price) - p.spent);
-    const me = { name: p.name, look: p.look, donated: p.cents / 100, tokens, freeLeft: !p.freeUsed, rankedLeft: p.rankedLeft, ownLeft: p.ownLeft, best: p.bestMs == null ? null : p.bestMs / 1000, receipts: p.receipts.slice().reverse(), spot: spotReceipt() };
+    const me = { name: p.name, look: p.look, best: p.bestMs == null ? null : p.bestMs / 1000, goes: p.goes };
     const you = { name: p.name || 'You', look: p.look, me: true };
-    const donors = [...SAMPLE_DONORS, ...(p.cents > 0 ? [{ ...you, amount: p.cents / 100 }] : [])].sort((a, b) => b.amount - a.amount).slice(0, 10);
     const shavers = [...SAMPLE_TIMES, ...(p.bestMs != null ? [{ ...you, secs: p.bestMs / 1000 }] : [])].sort((a, b) => a.secs - b.secs).slice(0, 10);
-    const people = [...SAMPLE_DONORS, ...(p.cents > 0 ? [{ amount: p.cents / 100 }] : [])];
-    const spot = { current: p.spots[0] || null, needed: needed(), step: 5, past: p.spots.slice(1) };
-    return { me, boards: { donors, shavers }, config: { tokenPrice: price, sample: true, raised: people.reduce((t, d) => t + d.amount, 0), donors: people.length, spot } };
+    const top = p.msgs.slice().sort((a, b) => b.cheers - a.cheers || b.when - a.when)[0] || null;
+    return { me, boards: { shavers }, config: { sample: true, top } };
   };
   return {
     load: async () => view(),
-    upload: async (blob, filename, pv) => {
-      await wait(900);
-      const amount = Math.round(parseFloat(pv.amount) * 100) / 100;
-      let result;
-      if (pv.to === 'other') result = { status: 'rejected', reason: "This receipt is for a different fundraiser. Only donations to Joash's page count." };
-      else if (pv.to === 'fake') result = { status: 'rejected', reason: "This doesn't look like a genuine World's Greatest Shave receipt, so it can't be counted." };
-      else if (pv.to === 'busy' && amount > 0) {
-        // Stands in for the queue: "checked" a few seconds later
-        result = { status: 'pending' };
-        const entry = { id: nextId++, amount: null, status: 'pending', reason: null, when: Date.now() };
-        setTimeout(() => { entry.status = 'ok'; entry.amount = amount; p.cents += Math.round(amount * 100); if (!p.name) p.name = 'Sam L.'; }, 6000);
-        p.receipts.push(entry);
-        const v = view();
-        return { ...v, result: { ...result, tokens: v.me.tokens } };
-      }
-      else if (pv.to === 'blurry' || !(amount > 0)) result = { status: 'rejected', reason: "We couldn't read that screenshot. Try a clear, uncropped one that shows Joash's name, the amount and the receipt number." };
-      else {
-        p.cents += Math.round(amount * 100);
-        if (!p.name) p.name = 'Sam L.';
-        result = { status: 'ok', amount, name: 'Sam L.' };
-      }
-      p.receipts.push({ id: nextId++, amount: result.status === 'ok' ? amount : null, status: result.status, reason: result.reason, when: Date.now() });
-      const v = view();
-      return { ...v, result: { ...result, tokens: v.me.tokens } };
-    },
     profile: async ({ look, name }) => { if (look) p.look = look; if (name) p.name = name.slice(0, 24); return view(); },
     start: async (mode) => {
-      const tokens = view().me.tokens;
-      const spend = (other) => { if (tokens < 1) throw new Error('You need a token for that. Upload a receipt to earn one.'); p.spent++; p[other]++; };
-      if (mode === 'ranked') { if (p.rankedLeft > 0) p.rankedLeft--; else spend('ownLeft'); }
-      else if (mode === 'own' && p.freeUsed) { if (p.ownLeft > 0) p.ownLeft--; else spend('rankedLeft'); }
-      else if (p.freeUsed) throw new Error("You've already used your free practice.");
-      else p.freeUsed = true;
+      if (p.goes < 1) throw new Error("You're out of goes. Post a message of support to earn 2 more.");
+      p.goes--;
       const runId = String(Math.random()).slice(2);
       p.runs[runId] = { mode };
       return { ...view(), runId };
@@ -1465,22 +1198,15 @@ function LocalAPI() {
       delete p.runs[runId];
       return view();
     },
-    claimSpot: async ({ receipt, kind, name, message, link, logo }) => {
-      await wait(700);
-      const r = p.receipts.find(r => r.id === receipt);
-      if (!r || p.used.has(receipt) || r.amount < needed()) throw new Error(`The top spot now needs a donation of $${needed()} or more.`);
-      screen(name + ' ' + message);
-      p.used.add(receipt);
-      const site = link ? link.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0] : null;
-      p.spots.unshift({ id: nextId++, kind, name: name || p.name || 'Anonymous', message, link: link ? (/^https?:/i.test(link) ? link : 'https://' + link) : null, site, amount: r.amount, logo: logo || null, when: Date.now() });
-      return { ...view(), took: true };
-    },
     messages: async () => msgs(),
     postMessage: async ({ name, text, prompt, dedKind, dedName }) => {
-      await wait(600); screen(name + ' ' + text + ' ' + (dedName || ''));
+      await wait(600);
+      if (text.replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(' ').filter(w => w.length > 1).length < 3) throw new Error("Write a real message of support to post it, like some encouragement, a memory or why you're backing the shave.");
+      screen(name + ' ' + text + ' ' + (dedName || ''));
       if (dedKind && !dedName) throw new Error('Add the name of the person it is for.');
       p.msgs.unshift({ id: nextId++, name, text, prompt: prompt || null, look: p.look, cheers: 0, cheered: false, when: Date.now(), dedication: dedKind ? { kind: dedKind, name: dedName } : null });
-      return { ...msgs(), posted: true };
+      p.goes += 2;
+      return { ...msgs(), posted: true, earned: 2, ...view() };
     },
     cheer: async (id) => { const m = p.msgs.find(m => m.id === id); if (m) { m.cheered = !m.cheered; m.cheers += m.cheered ? 1 : -1; } return msgs(); }
   };
@@ -1488,7 +1214,7 @@ function LocalAPI() {
 
 /* ---------- Site ---------- */
 // The donate tile: Joash's portrait shaves itself, and you can shave it by moving over it. The hair grows back.
-function DonateTile({ price }) {
+function DonateTile() {
   const ref = useRef(null);
   const [copied, setCopied] = useState(false);
   const canHover = typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches;
@@ -1572,7 +1298,7 @@ function DonateTile({ price }) {
       <div class="tile-copy">
         <p class="label">World's Greatest Shave</p>
         <h2 id="tile-title">Donate to my <em>WGS</em></h2>
-        <p class="tile-text">I'm raising money for people living with blood cancer. Every $${price} you give earns a timed go at shaving my pixel head. ${canHover ? 'Move your mouse over me to try.' : 'Drag your finger across me to try.'}</p>
+        <p class="tile-text">I'm raising money for people living with blood cancer. Donate, then see how fast you can shave my pixel head. ${canHover ? 'Move your mouse over me to try.' : 'Drag your finger across me to try.'}</p>
         <div class="tile-ctas">
           <a class="tbtn solid" href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate</a>
           <a class="tbtn" href=${PAGES.shave}>Play the shave game</a>
@@ -1601,17 +1327,35 @@ function ThemeToggle() {
   </button>`;
 }
 
+// The home page banner: the most loved message from the messages page
+function TopMessage({ top, sample }) {
+  const loved = top && top.cheers > 0;
+  return html`
+    <section class="topspot" aria-label=${loved ? 'Most loved message' : 'Latest message'}>
+      <div class="ts-head">
+        <span class="label">${loved ? 'Most loved message' : top ? 'Latest message' : 'Messages of support'}</span>
+        ${sample && html`<span class="chip">Sample</span>`}
+      </div>
+      <div class="ts-body"><div class="ts-text">
+        ${top ? html`<p class="ts-msg">${top.text}</p>
+          <p class="ts-by"><b>${top.name}</b>${top.dedication ? ` · ${top.dedication.kind === 'memory' ? 'In memory of' : 'In honour of'} ${top.dedication.name}` : ''}${loved ? ` · ${top.cheers} ${top.cheers === 1 ? 'heart' : 'hearts'}` : ''}</p>`
+        : html`<p class="ts-msg">No messages yet. Yours could be the first.</p>`}
+      </div></div>
+      <a class="ts-cta" href=${PAGES.messages}>${top ? 'Read and heart messages' : 'Leave a message'}</a>
+    </section>`;
+}
+
 // Home is about Joash: who he is first, the fundraiser under "Right now".
 function Home({ boards, config }) {
   return html`
     <div class="home">
-      <${TopSpot} spot=${config.spot} sample=${config.sample} />
+      <${TopMessage} top=${config.top} sample=${config.sample} />
       <section class="intro" aria-labelledby="hi">
         <h1 class="name" id="hi">Hi, I'm <em>Joash.</em></h1>
         <p class="lede">This is where I share what I'm working on and what I'm up to.</p>
       </section>
       <h2 class="label section-label">Right now</h2>
-      <${DonateTile} price=${config.tokenPrice} />
+      <${DonateTile} />
       <${MiniBoard} id="shaves" title="Fastest shaves" rows=${boards.shavers} val=${r => fmtTime(r.secs) + 's'} none="No times yet." sample=${config.sample} />
     </div>`;
 }
@@ -1622,25 +1366,24 @@ function Privacy() {
   return html`
     <div class="simple policy">
       <div>
-        <p class="eyebrow">Last updated 27 October 2026</p>
+        <p class="eyebrow">Last updated 28 October 2026</p>
         <h1 class="name">Privacy</h1>
       </div>
-      <p class="lede">This site raises money for Joash Jobson's World's Greatest Shave. It keeps as little about you as it can. Here's exactly what that is.</p>
+      <p class="lede">This site supports Joash Jobson's World's Greatest Shave fundraiser. It keeps as little about you as it can. Here's exactly what that is.</p>
       ${sec('No accounts, no tracking',
-        html`<p>There's no sign-up, no ads and no analytics. The first time you visit, your browser makes a random ID (a string of letters and numbers) and keeps it on your device. That's how the site remembers your tokens and times. Your browser also remembers whether you picked the light or dark theme. Neither is a cookie, and clearing your browser's site data removes both.</p>`)}
-      ${sec('Receipts',
-        html`<p>When you upload a receipt, the screenshot is sent to <a class="textlink" href="https://groq.com" target="_blank" rel="noopener">Groq</a>, an AI service, which reads who the donation went to, the amount, the receipt number, the date and the donor's name. Groq doesn't use it to train AI. Groq may keep a temporary log for up to 30 days to investigate abuse, unless that's turned off in its settings.</p>`,
-        html`<p>The screenshot itself isn't kept. If the checker is busy, it waits in a queue and is deleted as soon as it's been checked. The site keeps what was read from it: the amount, receipt number, donor name, who it went to and whether it was accepted, so a receipt can't be counted twice.</p>`)}
+        html`<p>There's no sign-up, no ads and no analytics. The first time you visit, your browser makes a random ID (a string of letters and numbers) and keeps it on your device. That's how the site remembers your avatar and best time. Your browser also remembers whether you picked the light or dark theme. Neither is a cookie, and clearing your browser's site data removes both.</p>`)}
+      ${sec('Donations',
+        html`<p>You donate on World's Greatest Shave's own website, not here. This site never sees your payment, your receipt or how much you gave.</p>`)}
       ${sec('The leaderboard',
-        html`<p>Your leaderboard name is the one you choose, or your first name and last initial from your receipt (like "Sam L."). Full names are never shown publicly. The leaderboards show that name, your avatar, your total donated and your best shave time.</p>`)}
-      ${sec('Messages and the top spot',
-        html`<p>Messages, and whatever is written in the top spot (a name, message, website and logo), are public. A message shows the name you type, your avatar and any "In honour of" or "In memory of" name you add, so only add someone's name if you're happy for it to be seen. Before anything goes up, the words (and any logo) are sent to Groq to check they're friendly. Joash can take any post down, and he may share messages in a video on social media, like LinkedIn.</p>`)}
+        html`<p>The leaderboard shows the name you choose, your avatar and your best shave time. Use a first name or a nickname if you'd rather not show your full name.</p>`)}
+      ${sec('Messages',
+        html`<p>Messages are public. A message shows the name you type, your avatar and any "In honour of" or "In memory of" name you add, so only add someone's name if you're happy for it to be seen. Before a message goes up, its words are sent to <a class="textlink" href="https://groq.com" target="_blank" rel="noopener">Groq</a>, an AI service, to check they're friendly. Groq doesn't use them to train AI. Joash can take any post down, and he may share messages in a video on social media, like LinkedIn.</p>`)}
       ${sec('Who sees what',
-        html`<p>Everyone can see the leaderboards. Joash can see the details read from each receipt on his admin page, and gets an email with the name, amount and receipt number when a donation is added. Nobody else gets your information, and it's never sold.</p>`)}
+        html`<p>Everyone can see the leaderboard and the messages. Joash can see the same names, times and messages on his admin page. Nobody else gets your information, and it's never sold.</p>`)}
       ${sec('Where it\'s kept',
-        html`<p>Everything is stored with Cloudflare, which runs the site. To stop floods of uploads, your IP address is turned into a code that can't be reversed and kept for a day. Cloudflare's own logs of visits are kept for a few days. Fonts are loaded from Google Fonts, so Google sees your IP address when the page loads. Emails to Joash are sent with Resend.</p>`)}
+        html`<p>Everything is stored with Cloudflare, which runs the site. To stop floods of posts, your IP address is turned into a code that can't be reversed and kept for a day. Cloudflare's own logs of visits are kept for a few days. Fonts are loaded from Google Fonts, so Google sees your IP address when the page loads.</p>`)}
       ${sec('Removing your information',
-        html`<p>Ask Joash and he'll delete everything the site holds about you: your name, avatar, times and receipt details. Any tokens you had go with it.</p>`)}
+        html`<p>Ask Joash and he'll delete everything the site holds about you: your name, avatar, times and messages.</p>`)}
     </div>`;
 }
 
@@ -1663,8 +1406,8 @@ function App() {
   const route = useRoute();
   const api = useMemo(() => PREVIEW ? LocalAPI() : RemoteAPI(), []);
   const [me, setMe] = useState(EMPTY_ME);
-  const [boards, setBoards] = useState({ donors: [], shavers: [] });
-  const [config, setConfig] = useState({ tokenPrice: 20, sample: PREVIEW });
+  const [boards, setBoards] = useState({ shavers: [] });
+  const [config, setConfig] = useState({ sample: PREVIEW });
   const [offline, setOffline] = useState(false);
   const lookPending = useRef(null);   // the newest avatar not yet saved, so an older reply can't undo a click
   const apply = useCallback((d) => {
@@ -1674,18 +1417,10 @@ function App() {
     return d;
   }, []);
   useEffect(() => { api.load().then(apply, () => setOffline(true)); }, []);
-  // While a receipt waits in the queue, check back every minute so its tokens show up without a refresh
-  const queued = me.receipts.some(r => r.status === 'pending');
-  useEffect(() => {
-    if (!queued) return;
-    const t = setInterval(() => api.load().then(apply, () => {}), PREVIEW ? 3000 : 60000);
-    return () => clearInterval(t);
-  }, [queued]);
 
   // Avatar changes show straight away and save half a second after the last click.
   const lookTimer = useRef(null);
   const actions = useMemo(() => ({
-    upload: async (blob, filename, pv) => apply(await api.upload(blob, filename, pv)).result,
     setLook: (look) => {
       lookPending.current = look;
       setMe(m => ({ ...m, look }));
@@ -1694,8 +1429,7 @@ function App() {
     },
     setName: async (name) => apply(await api.profile({ name })),
     start: async (mode) => apply(await api.start(mode)),
-    finish: async (o) => apply(await api.finish(o)),
-    claimSpot: async (o) => apply(await api.claimSpot(o))
+    finish: async (o) => apply(await api.finish(o))
   }), [api, apply]);
 
   return html`
@@ -1713,7 +1447,7 @@ function App() {
     <main>
       ${route === 'home' ? html`<${Home} boards=${boards} config=${config} />`
         : route === 'privacy' ? html`<${Privacy} />`
-        : route === 'messages' ? html`<${Messages} api=${api} me=${me} />`
+        : route === 'messages' ? html`<${Messages} api=${api} me=${me} onPosted=${apply} />`
         : route === 'video' ? html`<${MessageVideo} api=${api} config=${config} />`
         : html`<${WgsFundraiserSection} me=${me} boards=${boards} config=${config} actions=${actions} />`}
     </main>

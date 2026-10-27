@@ -22,7 +22,7 @@
 <main class="adm">
   <form id="login" class="adm-login">
     <h1 class="name">Admin</h1>
-    <p class="lede">See every receipt, tidy the leaderboard and posts, and download a backup.</p>
+    <p class="lede">Tidy the leaderboard and messages, and download a backup.</p>
     <label for="pw">Admin password<input id="pw" type="password" autocomplete="current-password" required></label>
     <button class="pbtn" type="submit">Sign in</button>
     <p class="err" id="login-err" role="alert"></p>
@@ -30,9 +30,7 @@
   <div id="panel" hidden>
     <div class="adm-bar">
       <div class="tabs" role="tablist">
-        <button role="tab" data-tab="ok" aria-selected="true">Added</button>
-        <button role="tab" data-tab="rejected" aria-selected="false">Turned down</button>
-        <button role="tab" data-tab="players" aria-selected="false">People</button>
+        <button role="tab" data-tab="players" aria-selected="true">People</button>
         <button role="tab" data-tab="posts" aria-selected="false">Posts</button>
       </div>
       <div class="adm-actions"><a class="textlink" href="/messages#video" target="_blank" rel="noopener">Make messages video</a><button class="textlink" id="backup" type="button">Download backup</button><button class="textlink" id="signout" type="button">Sign out</button></div>

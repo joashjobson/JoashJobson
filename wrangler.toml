@@ -6,6 +6,7 @@
 # KEEP THESE THE SAME IN EVERY VERSION: `name`, the [[durable_objects.bindings]] block and the [[migrations]] block.
 # The leaderboard, donations and receipts are saved under them. Changing one starts a new, empty database.
 # The name below must also match the Worker's name in the Cloudflare dashboard exactly.
+# The web address (joashjobson.me) is set in the dashboard under the Worker's Settings > Domains & Routes, not in this file.
 name = "joashjobson"
 main = "src/worker.js"
 compatibility_date = "2026-09-01"
@@ -13,8 +14,8 @@ compatibility_date = "2026-09-01"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-# /api/* always reaches the Worker; a path with no file gets the site's 404 page
-run_worker_first = ["/api/*"]
+# /api/* always reaches the Worker, and so does /shave (the Worker adds its link preview picture); a path with no file gets the site's 404 page
+run_worker_first = ["/api/*", "/shave"]
 not_found_handling = "404-page"
 
 # Where everything people do is saved: one Durable Object with its own SQLite database (free plan)

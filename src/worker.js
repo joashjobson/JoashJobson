@@ -12,7 +12,7 @@ const MIN_RUN_MS = 6000;           // no real shave is faster than this
 const RECEIPTS_PER_DAY = 10;       // per person
 const RECEIPTS_PER_IP_DAY = 30;
 const POSTS_PER_DAY = 5, POSTS_PER_IP_DAY = 20, POSTS_SITE_DAY = 400;   // Messages page, so it can't be flooded
-const PROMPTS = ['for', 'joash', 'anyone', 'business'];
+const PROMPTS = ['for', 'anyone', 'business'];
 const MAX_LOGO = 80000;
 const DAY = 86400000, MIN = 60000;
 const today = () => new Date().toISOString().slice(0, 10);

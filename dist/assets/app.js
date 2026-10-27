@@ -968,7 +968,6 @@ const TONES = ['paper', 'navy', 'paper', 'lime', 'paper', 'ink'];
 // Starter prompts give people a reason to write. The key is stored with the message; the label shows on its card.
 const PROMPTS = [
   { key: 'for', label: "I'm here for…", hint: 'Who are you here for? Someone you know who has had cancer, and what they mean to you.' },
-  { key: 'joash', label: 'To Joash…', hint: 'Good luck, a roast, or a bet on how bad he looks bald.' },
   { key: 'anyone', label: 'To anyone going through it…', hint: "What would you say to someone going through cancer right now?" },
   { key: 'business', label: 'From my business…', hint: 'Say who you are and why you are backing the shave.' }
 ];
@@ -996,7 +995,7 @@ function Messages({ api, me }) {
     <div class="msgs">
       <header class="msgs-head">
         <h1 class="name">Leave a <em>message.</em></h1>
-        <p class="lede">For Joash, for someone you love who's been through cancer, or for everyone shaving and donating. No donation needed.</p>
+        <p class="lede">For someone you love who's been through cancer, for anyone going through it now, or for everyone donating. No donation needed.</p>
       </header>
       <form class="composer" onSubmit=${post}>
         <${PixelAvatar} look=${me.look} size=${56} label="Your avatar" className="composer-av" />
@@ -1094,12 +1093,12 @@ function planVideo(list, W, H, host) {
     ctx.fontStretch = 'semi-expanded';
     if (sc.kind === 'intro') {
       ctx.fillStyle = '#F3F3EF'; ctx.fillRect(0, 0, W, H);
-      label(ctx, "Joash's World's Greatest Shave", pad, pad + 20, '#5B5F68');
+      label(ctx, "Joash's World's Greatest Shave fundraiser", pad, pad + 20, '#5B5F68');
       const up = 60 * (1 - ease(k / .6));
       ctx.globalAlpha = ease(k / .5);
-      ctx.font = '800 150px Archivo'; ctx.textBaseline = 'top'; ctx.fillStyle = '#0E1014';
-      ctx.fillText('Messages', pad, H * .26 + up); ctx.fillText('for', pad, H * .26 + 140 + up);
-      ctx.fillStyle = '#0A35A0'; ctx.fillText('Joash.', pad + ctx.measureText('for ').width, H * .26 + 140 + up);
+      ctx.font = '800 132px Archivo'; ctx.textBaseline = 'top'; ctx.fillStyle = '#0E1014';
+      ctx.fillText('Messages of', pad, H * .26 + up);
+      ctx.fillStyle = '#0A35A0'; ctx.fillText('support.', pad, H * .26 + 128 + up);
       ctx.globalAlpha = 1;
       ctx.font = '500 34px "Schibsted Grotesk"'; ctx.fillStyle = '#5B5F68';
       ctx.fillText(`${list.length} message${list.length === 1 ? '' : 's'} from people backing the shave`, pad, H * .26 + 330);
@@ -1123,7 +1122,7 @@ function planVideo(list, W, H, host) {
     } else {
       const [bg, fg, hi] = sc.tone, m = sc.m;
       ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-      label(ctx, `${promptOf(m.prompt) ? promptOf(m.prompt).label : 'Messages for Joash'}  ${sc.i + 1}/${list.length}`, pad, pad + 20, fg);
+      label(ctx, `${promptOf(m.prompt) ? promptOf(m.prompt).label : 'Messages of support'}  ${sc.i + 1}/${list.length}`, pad, pad + 20, fg);
       ctx.fillStyle = hi; ctx.font = '800 160px Archivo'; ctx.textBaseline = 'top'; ctx.fillText('“', pad - 6, pad + 40);
       const box = { x: pad, y: pad + 200, w: W - pad * 2, h: H - pad * 2 - 200 - 170 - (m.dedication ? 70 : 0) };
       const { size, lines } = fitText(ctx, m.text, box.w, box.h, m.text.length < 40 ? 120 : 88, 40);
@@ -1389,12 +1388,12 @@ const SAMPLE_SPOTS = [
 ];
 const SAMPLE_MESSAGES = [
   ['Ana L.', 'for', 'My nan. She had leukaemia when I was ten and the nurses were incredible. She still talks about them.', 14, 2, ['honour', 'Nan (Rosa)']],
-  ['Tom W.', 'joash', 'Absolute legend. See you on shave day.', 9, 4],
+  ['Tom W.', null, 'Donated, played, and beat Mei by two seconds. Worth every cent.', 9, 4],
   ['Mei C.', 'anyone', 'You are not on your own. Eat the good snacks, take the nap, let people help.', 16, 7],
   ['Northside Bakery', 'business', 'Free coffee for anyone who shows us they donated. Proud to back the shave.', 7, 12],
   ['Ben K.', 'for', 'My uncle Dave, who taught me to fish and never once let me win.', 21, 20, ['memory', 'Uncle Dave']],
   ['Priya S.', 'anyone', 'For everyone who has sat in a waiting room hoping for good news. This one is for you.', 23, 26],
-  ['Sam R.', 'joash', 'Go Joash!', 4, 40]
+  ['Sam R.', null, 'Every bit helps. Get around it!', 4, 40]
 ].map(([name, prompt, text, cheers, h, ded], i) => ({ id: 800 + i, name, prompt, text, look: SAMPLE_LOOKS[name] || (prompt === 'business' ? null : { skin: 2, hair: 0, style: 2, eyes: 1, face: 4, shirt: 0, extra: 0 }), cheers, cheered: false, when: NOW - h * HOUR, dedication: ded ? { kind: ded[0], name: ded[1] } : null }));
 
 function LocalAPI() {

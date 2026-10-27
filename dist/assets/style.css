@@ -1,26 +1,28 @@
-/* Joash Jobson. Style guide, so every page follows the same rules:
-   Colour: paper, ink, Plaeta navy as the one signature colour, chartreuse as the single pop. Solid fills only, no gradients or glows.
-   Type: Archivo (wide, heavy) for headings and numbers, Schibsted Grotesk for reading, Silkscreen (a pixel face) for small labels.
-   Shape: square corners, 1px rules, no drop shadows. Pages are left-aligned on a 12-column grid; tiles come in different sizes.
-   Spacing: steps of 4px (4, 8, 12, 16, 24, 32, 48, 64, 96). */
+/* Joash Jobson. Style guide (minimal):
+   Colour: warm off-white paper, charcoal text, two greys for sub-text and rules, and ONE accent (a calm steel blue) used
+   sparingly for buttons, links and the current page. A pale blue tint is the only highlight. Solid fills only, no gradients or glows.
+   Type: one family, Geist, for everything; hierarchy comes from size and weight. Geist Mono for small labels.
+   Reading lines stay around 50 to 75 characters. Lots of white space.
+   Shape: square corners, 1px rules, no drop shadows. Pages are left-aligned on a 12-column grid. */
 :root {
-  --bg: #F3F3EF;
+  --bg: #FAF9F6;
   --panel: #FFFFFF;
-  --sunk: #E8E8E2;
-  --ink: #0E1014;
-  --muted: #5B5F68;
-  --line: #D4D5CD;
-  --accent: #0A35A0;
-  --accent2: #2D5BD8;
-  --pop: #C8F03C;
-  --on-pop: #0E1014;
+  --sunk: #F0EEE9;
+  --ink: #2A2B2D;
+  --muted: #6E6F72;
+  --line: #E3E1DB;
+  --accent: #2F5D8A;
+  --accent2: #244A70;
+  --pop: #D6E4F0;
+  --on-pop: #1F2B38;
   --gold: #C2B02E;
   --warn: #C8462E;
   --on-accent: #FFFFFF;
   --good: #3F7A35;
-  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
-  --body: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --pixel: "Silkscreen", ui-monospace, monospace;
+  --display: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pixel: "Geist Mono", ui-monospace, monospace;
+  --arcade-pixel: "Silkscreen", ui-monospace, monospace;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --max: 1200px;
   --gut: max(16px, env(safe-area-inset-left, 0px));
@@ -28,14 +30,14 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0B0D11; --panel: #13161C; --sunk: #090A0D; --ink: #EDEEE8; --muted: #9A9EA8; --line: #272B34;
-    --accent: #87A2FF; --accent2: #5B83F0; --gold: #D9C64A; --warn: #FF7A5C; --on-accent: #0B0D11; --good: #8DCF7E;
+    --bg: #1C1D1F; --panel: #232427; --sunk: #17181A; --ink: #ECEBE7; --muted: #9C9DA1; --line: #34353A;
+    --accent: #9DBEDD; --accent2: #B7D0E8; --gold: #D9C98A; --warn: #E8907A; --on-accent: #1C1D1F; --good: #9CC79A; --pop: #2E3D4D; --on-pop: #DCE8F3;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0B0D11; --panel: #13161C; --sunk: #090A0D; --ink: #EDEEE8; --muted: #9A9EA8; --line: #272B34;
-  --accent: #87A2FF; --accent2: #5B83F0; --gold: #D9C64A; --warn: #FF7A5C; --on-accent: #0B0D11; --good: #8DCF7E;
+  --bg: #1C1D1F; --panel: #232427; --sunk: #17181A; --ink: #ECEBE7; --muted: #9C9DA1; --line: #34353A;
+  --accent: #9DBEDD; --accent2: #B7D0E8; --gold: #D9C98A; --warn: #E8907A; --on-accent: #1C1D1F; --good: #9CC79A; --pop: #2E3D4D; --on-pop: #DCE8F3;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -48,13 +50,13 @@ button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .wrap { max-width: var(--max); margin: 0 auto; padding-left: var(--gut); padding-right: var(--gut-r); }
 
 /* Type */
-.label, .eyebrow { font-family: var(--pixel); font-size: 11px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0; display: flex; align-items: center; gap: 8px; }
+.label, .eyebrow { font-family: var(--pixel); font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; display: flex; align-items: center; gap: 8px; }
 .eyebrow .bits { display: inline-flex; gap: 2px; }
 .px { display: inline-block; width: 8px; height: 8px; vertical-align: middle; }
 .px.o { background: var(--accent); } .px.t { background: var(--accent2); } .px.l { background: var(--pop); }
-.name { font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: clamp(48px, 9vw, 104px); line-height: .92; letter-spacing: -.035em; margin: 0; text-wrap: balance; }
+.name { font-family: var(--display); font-weight: 600; font-size: clamp(44px, 7.5vw, 92px); line-height: .98; letter-spacing: -.045em; margin: 0; text-wrap: balance; }
 .name em { font-style: normal; color: var(--accent); }
-h2 { font-family: var(--display); font-weight: 800; font-stretch: 108%; letter-spacing: -.03em; line-height: 1; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 600; letter-spacing: -.03em; line-height: 1; margin: 0; text-wrap: balance; }
 h2 em { font-style: normal; color: var(--accent); }
 .lede { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.5; max-width: 34em; }
 
@@ -62,12 +64,12 @@ h2 em { font-style: normal; color: var(--accent); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 .topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
 .topbar-in { max-width: var(--max); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 60px; padding-left: var(--gut); padding-right: var(--gut-r); }
-.home-link { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: 17px; letter-spacing: -.01em; }
+.home-link { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
 .home-link .pix { image-rendering: pixelated; background: var(--sunk); }
 .toplinks { display: flex; align-items: center; gap: 4px; }
 .toplinks a { text-decoration: none; color: var(--muted); font-size: 15px; font-weight: 500; padding: 6px 10px; }
 .toplinks a:hover, .toplinks a[aria-current=page] { color: var(--ink); }
-.toplinks a[aria-current=page] { box-shadow: inset 0 -2px 0 var(--pop); }
+.toplinks a[aria-current=page] { box-shadow: inset 0 -2px 0 var(--accent); }
 .theme { width: 36px; height: 36px; border: 1px solid transparent; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .theme:hover { color: var(--ink); border-color: var(--line); }
 
@@ -89,7 +91,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 /* Home: a big hello across the top, then what Joash is doing right now as tiles of different sizes */
 .home { max-width: var(--max); margin: 0 auto; padding: 64px var(--gut-r) 96px var(--gut); display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .intro { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; align-items: end; padding-bottom: 72px; }
-.intro .name { grid-column: 1 / span 8; font-size: clamp(56px, 11vw, 148px); }
+.intro .name { grid-column: 1 / span 8; font-size: clamp(52px, 9vw, 128px); }
 .intro .lede { grid-column: 9 / span 4; padding-bottom: 12px; }
 .section-label { grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--ink); margin-bottom: 4px; color: var(--ink); }
 .tile { position: relative; background: var(--panel); border: 1px solid var(--line); padding: 20px; min-width: 0; }
@@ -106,11 +108,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .facts > div { padding: 14px 0; display: grid; gap: 2px; }
 .facts > div + div { border-left: 1px solid var(--line); padding-left: 16px; }
 .facts dd { margin: 0; }
-.facts dd:not(.small) { font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: 30px; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.facts dd:not(.small) { font-family: var(--display); font-weight: 600; font-size: 30px; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
 
 /* Donate tile: solid navy, the portrait stands on the bottom edge and runs off the right side */
-.tile.donate { --t-ink: #FFFFFF; --t-soft: #C9D6FB; --t-line: rgba(255, 255, 255, .28);
-  background: #0A35A0; border-color: #0A35A0; color: var(--t-ink); padding: 28px; overflow: hidden; min-height: 360px;
+.tile.donate { --t-ink: #FFFFFF; --t-soft: #C9CCD1; --t-line: rgba(255, 255, 255, .28);
+  background: #2A2B2D; border-color: #2A2B2D; color: var(--t-ink); padding: 28px; overflow: hidden; min-height: 360px;
   display: grid; grid-template-columns: minmax(0, 1fr) 240px; align-items: start; }
 .donate .tile-copy { display: grid; gap: 16px; min-width: 0; position: relative; z-index: 1; align-self: start; }
 .donate .label { color: var(--t-soft); }
@@ -119,13 +121,13 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tile-text { margin: 0; color: var(--t-soft); font-size: 16px; max-width: 26em; }
 .tile-ctas { display: flex; flex-wrap: wrap; gap: 8px; }
 .tbtn { font: 600 15px/1 var(--body); padding: 14px 18px; text-decoration: none; color: var(--t-ink); border: 1px solid var(--t-line); transition: background .12s, color .12s; }
-.tbtn:hover { background: #FFFFFF; color: #0A35A0; }
+.tbtn:hover { background: #FFFFFF; color: #2A2B2D; }
 .tbtn.solid { background: var(--pop); color: var(--on-pop); border-color: var(--pop); }
-.tbtn.solid:hover { background: #FFFFFF; border-color: #FFFFFF; color: #0A35A0; }
+.tbtn.solid:hover { background: #FFFFFF; border-color: #FFFFFF; color: #2A2B2D; }
 .linkbox { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 10px 10px 10px 12px; border: 1px solid var(--t-line); max-width: 380px; }
 .lb-label { grid-column: 1 / -1; font-family: var(--pixel); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--t-soft); white-space: nowrap; }
 .lb-url { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all; }
-.lb-copy { font: 600 13px var(--body); padding: 8px 12px; border: 0; background: #FFFFFF; color: #0A35A0; cursor: pointer; }
+.lb-copy { font: 600 13px var(--body); padding: 8px 12px; border: 0; background: #FFFFFF; color: #2A2B2D; cursor: pointer; }
 .lb-copy:hover { background: var(--pop); color: var(--on-pop); }
 .tile-art-wrap { position: absolute; right: -20px; bottom: -1px; width: 280px; height: 280px; }
 .tile-block { position: absolute; left: 53px; top: 18px; width: 178px; height: 178px; background: var(--pop); }
@@ -182,11 +184,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .stage.menu .overlay { position: relative; inset: auto; }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--bg) 72%, transparent); text-align: center; }
 .overlay .box { background: var(--panel); border: 1px solid var(--ink); padding: 24px; max-width: 360px; width: 100%; display: grid; gap: 12px; justify-items: center; }
-.overlay h4 { font-family: var(--display); font-weight: 800; font-stretch: 108%; letter-spacing: -.03em; font-size: 38px; line-height: 1; margin: 0; }
+.overlay h4 { font-family: var(--display); font-weight: 600; letter-spacing: -.03em; font-size: 38px; line-height: 1; margin: 0; }
 .overlay h4 em { font-style: normal; color: var(--accent); }
 .overlay p { margin: 0; font-size: 14px; color: var(--muted); }
 .overlay .btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.bigtime { font-family: var(--display); font-weight: 800; font-size: 40px; font-variant-numeric: tabular-nums; }
+.bigtime { font-family: var(--display); font-weight: 600; font-size: 40px; font-variant-numeric: tabular-nums; }
 .gamebar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
 .gamebar .modechip { font-family: var(--pixel); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--line); }
 .rules { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
@@ -195,6 +197,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 /* Arcade cabinet: the game keeps a dark navy case in both themes, with the pixel face on the scoreboard and labels */
 .arcade {
+  /* The game keeps its v13 WGS look: navy case, lime, Archivo and Silkscreen */
+  --pop: #C8F03C; --on-pop: #0E1014; --display: "Archivo", "Arial Narrow", system-ui, sans-serif; --body: "Schibsted Grotesk", system-ui, sans-serif; --pixel: var(--arcade-pixel);
   --ink: #ECEEF5; --muted: #9AA1B4; --bg: #070A1C; --panel: #10173A; --sunk: #070A1C; --line: #26306A;
   --accent: #8EA9FF; --accent2: #5B83F0; --gold: #F2D84B; --warn: #FF7A5C; --on-accent: #070A1C;
   color: var(--ink); background: #0D1433; border: 1px solid #0D1433; padding: 16px;
@@ -400,7 +404,7 @@ footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; g
 .ts-body { grid-area: body; display: flex; gap: 16px; align-items: center; min-width: 0; }
 .ts-logo { width: 56px; height: 56px; object-fit: contain; background: #fff; padding: 4px; flex: none; }
 .ts-text { min-width: 0; }
-.ts-msg { margin: 0; font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: clamp(20px, 2.6vw, 32px); line-height: 1.08; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.ts-msg { margin: 0; font-family: var(--display); font-weight: 600; font-size: clamp(20px, 2.6vw, 32px); line-height: 1.08; letter-spacing: -.02em; overflow-wrap: anywhere; }
 .ts-msg::before { content: "\201C"; color: var(--pop); }
 .ts-msg::after { content: "\201D"; color: var(--pop); }
 .ts-by { margin: 8px 0 0; font-size: 14px; opacity: .8; }
@@ -447,7 +451,7 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
 .mnote.lime { background: var(--pop); color: var(--on-pop); border-color: var(--pop); }
 .mnote.ink { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .note-text { margin: 0; font-size: 18px; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-line; }
-.mnote.short .note-text { font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: 30px; line-height: 1.02; letter-spacing: -.02em; }
+.mnote.short .note-text { font-family: var(--display); font-weight: 600; font-size: 30px; line-height: 1.02; letter-spacing: -.02em; }
 .note-foot { display: flex; align-items: center; gap: 10px; }
 .note-foot svg:first-child, .note-foot canvas { image-rendering: pixelated; background: rgba(127,127,127,.15); flex: none; }
 .note-dot { width: 28px; height: 28px; background: currentColor; opacity: .2; flex: none; }
@@ -497,7 +501,7 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
 .ded input[type=text] { flex: 1; min-width: 160px; width: auto; }
 .wall-filter { display: flex; flex-wrap: wrap; margin-bottom: 16px; }
 .note-prompt { margin: 0 0 -10px; font-family: var(--pixel); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .75; }
-.note-ded { margin: 0; padding-left: 12px; border-left: 4px solid var(--pop); font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: 16px; letter-spacing: -.01em; }
+.note-ded { margin: 0; padding-left: 12px; border-left: 4px solid var(--pop); font-family: var(--display); font-weight: 600; font-size: 16px; letter-spacing: -.01em; }
 .mnote.lime .note-ded { border-left-color: var(--accent); }
 .mnote.paper .note-ded { border-left-color: var(--accent); }
 @media (max-width: 620px) { .wall-filter { display: flex; overflow-x: auto; flex-wrap: nowrap; max-width: 100%; } .wall-filter button { white-space: nowrap; } }
@@ -517,14 +521,34 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
   .home > .topspot { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "body" "cta"; padding: 14px 16px; margin: -8px 0 16px; }
 }
 /* The top spot keeps its ink-and-lime look in both themes */
-.topspot { background: #0E1014; color: #F3F3EF; border: 1px solid var(--line); }
-.topspot .label { color: #C8F03C; }
-.topspot .chip { color: #F3F3EF; }
-.ts-by a { color: #C8F03C; }
-.ts-cta { background: #C8F03C; color: #0E1014; border-color: #C8F03C; }
-@media (hover: hover) { .ts-cta:hover { background: transparent; color: #C8F03C; } }
+.topspot { background: #2A2B2D; color: #FAF9F6; border: 1px solid var(--line); }
+.topspot .label { color: #BFD6EA; }
+.topspot .chip { color: #FAF9F6; }
+.ts-by a { color: #BFD6EA; }
+.ts-cta { background: #BFD6EA; color: #2A2B2D; border-color: #BFD6EA; }
+@media (hover: hover) { .ts-cta:hover { background: transparent; color: #BFD6EA; } }
 @media (max-width: 460px) { .home-link .surname { display: none; } }
 .cheer .heart { fill: currentColor; fill-opacity: .28; stroke: none; }
 .cheer.on .heart { fill-opacity: 1; }
 .spotform label { position: relative; }
 .spotform label .count { float: none; position: absolute; right: 0; top: 0; }
+
+/* Everything World's Greatest Shave keeps the v13 look (navy, ink, lime; Archivo, Schibsted Grotesk, Silkscreen) in both themes.
+   The rest of the site uses the minimal palette above. */
+.mnote.navy, .mnote.ink { --pop: #BFD6EA; --on-pop: #1F2B38; }
+.donate, .topspot { --pop: #C8F03C; --on-pop: #0E1014;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif; --body: "Schibsted Grotesk", system-ui, sans-serif; --pixel: var(--arcade-pixel); --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-family: var(--body); }
+.donate h2 { font-weight: 800; font-stretch: 108%; letter-spacing: -.03em; }
+.tile.donate { --t-ink: #FFFFFF; --t-soft: #C9D6FB; background: #0A35A0; border-color: #0A35A0; }
+.tbtn:hover, .tbtn.solid:hover, .lb-copy { color: #0A35A0; }
+.topspot { background: #0E1014; color: #F3F3EF; }
+.topspot .label, .ts-by a { color: #C8F03C; }
+.topspot .chip { color: #F3F3EF; }
+.ts-msg { font-weight: 800; font-stretch: 112%; }
+.ts-cta { background: #C8F03C; color: #0E1014; border-color: #C8F03C; }
+@media (hover: hover) { .ts-cta:hover { background: transparent; color: #C8F03C; } }
+
+/* Logo: "J_" (a J and a terminal cursor) in a thin frame, cursor in the accent blue. Same mark as favicon.png */
+.jmark { width: 28px; height: 28px; flex: none; box-shadow: inset 0 0 0 1px var(--ink); color: var(--ink); display: inline-flex; align-items: baseline; justify-content: center; padding-top: 3px; font: 500 21px/1 "Geist", system-ui, sans-serif; }
+.jmark b { font-weight: 500; line-height: .9; }
+.jmark i { display: inline-block; width: 7px; height: 2px; margin-left: 1.5px; background: var(--accent); }

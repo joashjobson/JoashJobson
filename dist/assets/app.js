@@ -1608,7 +1608,7 @@ function Home({ boards, config }) {
       <${TopSpot} spot=${config.spot} sample=${config.sample} />
       <section class="intro" aria-labelledby="hi">
         <h1 class="name" id="hi">Hi, I'm <em>Joash.</em></h1>
-        <p class="lede">When I start something, I get obsessed with seeing it through from start to finish. I love building things, online or with my hands, and I'm always picking up new skills, from finance to writing software.</p>
+        <p class="lede">This is where I share what I'm working on and what I'm up to.</p>
       </section>
       <h2 class="label section-label">Right now</h2>
       <${DonateTile} price=${config.tokenPrice} />
@@ -1701,7 +1701,7 @@ function App() {
   return html`
     <header class="topbar">
       <div class="topbar-in">
-        <a href=${PAGES.home} class="home-link" aria-current=${route === 'home' ? 'page' : null}><${PixelAvatar} look=${JOASH} size=${28} label="" /><span>Joash<span class="surname"> Jobson</span></span></a>
+        <a href=${PAGES.home} class="home-link" aria-current=${route === 'home' ? 'page' : null}><span class="jmark" aria-hidden="true"><b>J</b><i></i></span><span>Joash<span class="surname"> Jobson</span></span></a>
         <nav class="toplinks" aria-label="Main">
           <a href=${PAGES.messages} aria-current=${route === 'messages' ? 'page' : null}>Messages</a>
           <a href=${PAGES.shave} aria-current=${route === 'shave' ? 'page' : null}>Shave game</a>

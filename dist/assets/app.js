@@ -1701,7 +1701,7 @@ function App() {
   return html`
     <header class="topbar">
       <div class="topbar-in">
-        <a href=${PAGES.home} class="home-link" aria-current=${route === 'home' ? 'page' : null}><span class="jmark" aria-hidden="true"><b>J</b><i></i></span><span>Joash<span class="surname"> Jobson</span></span></a>
+        <a href=${PAGES.home} class="home-link" aria-current=${route === 'home' ? 'page' : null}><svg class="jmark" viewBox="0 0 28 28" aria-hidden="true"><rect x=".5" y=".5" width="27" height="27" fill="none" stroke="currentColor"/><g transform="translate(2.6809 21.5029) scale(0.02162 -0.02162)"><path fill="currentColor" d="M298 -16Q227 -16 173.5 16.5Q120 49 91 106.5Q62 164 61 239L171 245Q172 165 205 124Q238 83 298 83Q361 83 394.5 126Q428 169 428 250V710H536V250Q536 169 506.5 109Q477 49 424 16.5Q371 -16 298 -16Z"/><rect class="jm-c" x="656" y="0" width="330" height="100"/></g></svg><span>Joash<span class="surname"> Jobson</span></span></a>
         <nav class="toplinks" aria-label="Main">
           <a href=${PAGES.messages} aria-current=${route === 'messages' ? 'page' : null}>Messages</a>
           <a href=${PAGES.shave} aria-current=${route === 'shave' ? 'page' : null}>Shave game</a>

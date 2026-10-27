@@ -548,7 +548,7 @@ input[type=file] { font: 14px var(--body); max-width: 100%; }
 .ts-cta { background: #C8F03C; color: #0E1014; border-color: #C8F03C; }
 @media (hover: hover) { .ts-cta:hover { background: transparent; color: #C8F03C; } }
 
-/* Logo: "J_" (a J and a terminal cursor) in a thin frame, cursor in the accent blue. Same mark as favicon.png */
-.jmark { width: 28px; height: 28px; flex: none; box-shadow: inset 0 0 0 1px var(--ink); color: var(--ink); display: inline-flex; align-items: baseline; justify-content: center; padding-top: 3px; font: 500 21px/1 "Geist", system-ui, sans-serif; }
-.jmark b { font-weight: 500; line-height: .9; }
-.jmark i { display: inline-block; width: 7px; height: 2px; margin-left: 1.5px; background: var(--accent); }
+/* Logo: "J_" (a J and a terminal cursor) in a thin frame, cursor in the accent blue. Drawn as an exact outline (tools/make-icons.py),
+   centred on its ink box, so it doesn't depend on the font loading. Same mark as the tab icons. */
+.jmark { width: 28px; height: 28px; flex: none; display: block; color: var(--ink); }
+.jmark .jm-c { fill: var(--accent); }

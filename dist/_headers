@@ -15,3 +15,17 @@
 /admin.html
   X-Robots-Tag: noindex
   Cache-Control: no-store
+
+# Tab and home-screen icons: browsers hold on to old icons, so these are checked again every day.
+# The pages ask for them with ?v=15, so a new version can change that number to make browsers fetch the new icon.
+/favicon.ico
+  Cache-Control: public, max-age=86400
+
+/favicon.png
+  Cache-Control: public, max-age=86400
+
+/icon-32.png
+  Cache-Control: public, max-age=86400
+
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400

@@ -384,35 +384,38 @@ const AUD = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD',
 const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- Avatar maker: preset parts only, so nothing needs moderating ---------- */
+// Colours are swatches you tap; shapes step through with arrows. The value boxes have a fixed width, so nothing shifts as you click.
 function AvatarMaker({ look, onChange }) {
-  const traits = [
-    ['style', 'Hair', STYLES],
-    ['hair', 'Hair colour', HAIR_COLS.map(t => t.name)],
-    ['skin', 'Skin', SKIN_TONES.map(t => t.name)],
-    ['eyes', 'Eyes', EYE_COLS.map(t => t.name)],
-    ['face', 'Face', FACES],
-    ['shirt', 'Shirt', SHIRTS.map(t => t.name)],
-    ['extra', 'Extra', EXTRAS]
-  ];
-  const step = (key, n, len) => onChange({ ...look, [key]: (look[key] + n + len) % len });
-  const shuffle = () => { const l = {}; for (const [k, , opts] of traits) l[k] = Math.floor(Math.random() * opts.length); onChange(l); };
+  const shapes = [['style', 'Hairstyle', STYLES], ['face', 'Face', FACES], ['extra', 'Extra', EXTRAS]];
+  const colours = [['hair', 'Hair colour', HAIR_COLS], ['skin', 'Skin', SKIN_TONES], ['eyes', 'Eyes', EYE_COLS], ['shirt', 'Shirt', SHIRTS]];
+  const set = (key, v) => onChange({ ...look, [key]: v });
+  const step = (key, n, len) => set(key, (look[key] + n + len) % len);
+  const shuffle = () => { const l = {}; for (const [k, , opts] of [...shapes, ...colours]) l[k] = Math.floor(Math.random() * opts.length); onChange(l); };
   return html`
     <div class="maker">
-        <div class="maker-left">
-          <${PixelAvatar} look=${look} size=${128} label="Your avatar preview" className="maker-preview" />
-          <button type="button" class="linkbtn" id="avatar-shuffle" onClick=${shuffle}>Shuffle</button>
-        </div>
-        <div class="traits">
-          ${traits.map(([key, label, opts]) => html`
-            <div class="trait" key=${key}>
-              <span class="tlabel">${label}</span>
-              <div class="stepper">
-                <button type="button" id=${'prev-' + key} aria-label=${'Previous ' + label.toLowerCase()} onClick=${() => step(key, -1, opts.length)}>‹</button>
-                <span class="tval">${opts[look[key]]}</span>
-                <button type="button" id=${'next-' + key} aria-label=${'Next ' + label.toLowerCase()} onClick=${() => step(key, 1, opts.length)}>›</button>
-              </div>
-            </div>`)}
-        </div>
+      <div class="maker-left">
+        <${PixelAvatar} look=${look} size=${152} label="Your avatar preview" className="maker-preview" />
+        <button type="button" class="btn ghost small" id="avatar-shuffle" onClick=${shuffle}>Shuffle</button>
+      </div>
+      <div class="traits">
+        ${shapes.map(([key, label, opts]) => html`
+          <div class="trait" key=${key}>
+            <span class="tlabel" id=${'tl-' + key}>${label}</span>
+            <div class="stepper" role="group" aria-labelledby=${'tl-' + key}>
+              <button type="button" id=${'prev-' + key} aria-label=${'Previous ' + label.toLowerCase()} onClick=${() => step(key, -1, opts.length)}>‹</button>
+              <span class="tval" aria-live="polite">${opts[look[key]]}</span>
+              <button type="button" id=${'next-' + key} aria-label=${'Next ' + label.toLowerCase()} onClick=${() => step(key, 1, opts.length)}>›</button>
+            </div>
+          </div>`)}
+        ${colours.map(([key, label, opts]) => html`
+          <div class="trait" key=${key}>
+            <span class="tlabel" id=${'tl-' + key}>${label}<b>${opts[look[key]].name}</b></span>
+            <div class="swatches" role="radiogroup" aria-labelledby=${'tl-' + key}>
+              ${opts.map((o, i) => html`<button type="button" key=${i} role="radio" class="sw" id=${key + '-' + i} aria-checked=${look[key] === i} aria-label=${o.name} title=${o.name}
+                style=${{ '--c': o.base }} onClick=${() => set(key, i)}></button>`)}
+            </div>
+          </div>`)}
+      </div>
     </div>`;
 }
 
@@ -791,14 +794,13 @@ function Leaderboard({ boards, sample }) {
     </div>`;
 }
 
-function MiniBoards({ boards, sample }) {
-  const list = (rows, val, none) => rows.length === 0 ? html`<p class="empty">${none}</p>` : html`<ol class="mini">${rows.slice(0, 3).map((r, i) => html`
-    <li key=${i} class=${r.me ? 'me' : ''}><span class="rank">${i + 1}</span><${PixelAvatar} look=${r.look} size=${28} label=${r.name + "'s avatar"} /><span class="who">${r.name}</span><span class="val">${val(r)}</span></li>`)}</ol>`;
+function MiniBoard({ id, title, rows, val, none, sample }) {
   return html`
-    <section class="minis" aria-label="Leaderboards">
-      <div><h3 class="mini-h">Fastest shaves</h3>${list(boards.shavers, r => fmtTime(r.secs) + 's', 'No times yet.')}</div>
-      <div><h3 class="mini-h">Top donors</h3>${list(boards.donors, r => AUD.format(r.amount), 'No donations yet.')}</div>
-      <p class="mini-foot">${sample ? html`<span class="chip sample">Sample entries</span>` : html`<span></span>`}<a href=${PAGES.shave}>Full leaderboard →</a></p>
+    <section class=${'tile board-tile ' + id} aria-labelledby=${id + '-h'}>
+      <header class="tile-head"><h2 class="label" id=${id + '-h'}>${title}</h2>${sample && html`<span class="chip sample">Sample</span>`}</header>
+      ${rows.length === 0 ? html`<p class="empty">${none}</p>` : html`<ol class="mini">${rows.slice(0, 3).map((r, i) => html`
+        <li key=${i} class=${r.me ? 'me' : ''}><span class="rank">${i + 1}</span><${PixelAvatar} look=${r.look} size=${32} label=${r.name + "'s avatar"} /><span class="who">${r.name}</span><span class="val">${val(r)}</span></li>`)}</ol>`}
+      <a class="tile-more" href=${PAGES.shave + (PREVIEW ? '' : '#board')}>Full leaderboard</a>
     </section>`;
 }
 
@@ -814,14 +816,23 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
   return html`
     <div class="shave" id="shave">
       <header class="shave-head">
-        <p class="eyebrow"><span class="bits"><span class="px o"></span><span class="px t"></span><span class="px l"></span></span>World's Greatest Shave</p>
+        <p class="label">World's Greatest Shave</p>
         <h1 class="name">How fast can you shave my <em>pixel head?</em></h1>
-        <p class="lede">I'm raising money for World's Greatest Shave to support people living with blood cancer. Donate, and every $${price} gets you a timed go at shaving the pixel version of me, plus a go at shaving your own avatar.</p>
+        <p class="lede">I'm raising money for World's Greatest Shave to support people living with blood cancer. Every $${price} you donate gets you a timed go at shaving the pixel version of me, plus a go at shaving your own avatar.</p>
+        <dl class="facts">
+          <div><dt class="label">Donated here</dt><dd>${AUD.format(config.raised || 0)}</dd><dd class="small">${config.donors ? `from ${config.donors} ${config.donors === 1 ? 'person' : 'people'}` : 'Be the first'}</dd></div>
+          <div><dt class="label">Record</dt><dd>${boards.shavers[0] ? fmtTime(boards.shavers[0].secs) + 's' : '–'}</dd><dd class="small">${boards.shavers[0] ? boards.shavers[0].name : 'No times yet'}</dd></div>
+        </dl>
         <div class="head-ctas">
           <a class="pbtn" href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate to my WGS</a>
-          <button type="button" class="textlink" onClick=${toGame}>Skip to the game ↓</button>
+          <button type="button" class="textlink" onClick=${toGame}>Skip to the game</button>
         </div>
+        <ol class="stepnav" aria-label="Steps">
+          ${[['step-1', 'Donate'], ['step-2', 'Upload your receipt'], ['step-3', 'Make your avatar'], ['step-4', 'Shave'], ['step-5', 'Leaderboard']].map(([id, t], i) =>
+            html`<li key=${id}><a href=${'#' + id} onClick=${e => { e.preventDefault(); document.getElementById(id).closest('section').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth' }); }}><span>0${i + 1}</span>${t}</a></li>`)}
+        </ol>
       </header>
+      <div class="shave-main">
 
       <section class="step" aria-labelledby="step-1">
         <h2 class="step-h" id="step-1"><span class="step-n">01</span>Donate on my WGS page</h2>
@@ -873,7 +884,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
           onStart=${actions.start} onWin=${actions.finish} />
       </section>
 
-      <section class="step" aria-labelledby="step-5">
+      <section class="step" id="board" aria-labelledby="step-5">
         <h2 class="step-h" id="step-5"><span class="step-n">05</span>Climb the leaderboard</h2>
         <ul class="points">
           <li><span><strong>Fastest Shavers</strong> shows each person's best ranked time.</span></li>
@@ -881,6 +892,7 @@ function WgsFundraiserSection({ me, boards, config, actions }) {
         </ul>
         <${Leaderboard} boards=${boards} sample=${config.sample} />
       </section>
+      </div>
     </div>`;
 }
 
@@ -941,7 +953,8 @@ function LocalAPI() {
     const you = { name: p.name || 'You', look: p.look, me: true };
     const donors = [...SAMPLE_DONORS, ...(p.cents > 0 ? [{ ...you, amount: p.cents / 100 }] : [])].sort((a, b) => b.amount - a.amount).slice(0, 10);
     const shavers = [...SAMPLE_TIMES, ...(p.bestMs != null ? [{ ...you, secs: p.bestMs / 1000 }] : [])].sort((a, b) => a.secs - b.secs).slice(0, 10);
-    return { me, boards: { donors, shavers }, config: { tokenPrice: price, sample: true } };
+    const people = [...SAMPLE_DONORS, ...(p.cents > 0 ? [{ amount: p.cents / 100 }] : [])];
+    return { me, boards: { donors, shavers }, config: { tokenPrice: price, sample: true, raised: people.reduce((t, d) => t + d.amount, 0), donors: people.length } };
   };
   return {
     load: async () => view(),
@@ -1059,8 +1072,8 @@ function DonateTile({ price }) {
       if (mode === 'regrow') { ctx.globalAlpha = Math.min(1, regrow); ctx.drawImage(grown, 0, 0); ctx.globalAlpha = 1; }
       if (clip) {
         const bx = Math.floor(clip[0] - 2), by = Math.floor(clip[1] - 1.5);
-        ctx.fillStyle = '#14161F'; ctx.fillRect(bx, by + 3, 4, 6);
-        ctx.fillStyle = '#C2B02E'; ctx.fillRect(bx + 1, by + 3, 2, 5);
+        ctx.fillStyle = '#0E1014'; ctx.fillRect(bx, by + 3, 4, 6);
+        ctx.fillStyle = '#C8F03C'; ctx.fillRect(bx + 1, by + 3, 2, 5);
         ctx.fillStyle = '#E6E4DE'; ctx.fillRect(bx, by + 2, 4, 1);
       }
       raf = requestAnimationFrame(frame);
@@ -1075,11 +1088,11 @@ function DonateTile({ price }) {
   const selectLink = () => { const el = document.getElementById('donate-url'); const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); };
   const shown = FUNDRAISER.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
   return html`
-    <section class="tile" aria-labelledby="tile-title">
+    <section class="tile donate" aria-labelledby="tile-title">
       <div class="tile-copy">
-        <p class="tile-eyebrow"><span class="px l"></span>World's Greatest Shave</p>
+        <p class="label">World's Greatest Shave</p>
         <h2 id="tile-title">Donate to my <em>WGS</em></h2>
-        <p class="tile-text">Every $${price} earns a token to take the clippers to my pixel head. ${canHover ? 'Move over me to try.' : 'Drag across me to try.'}</p>
+        <p class="tile-text">I'm raising money for people living with blood cancer. Every $${price} you give earns a timed go at shaving my pixel head. ${canHover ? 'Move your mouse over me to try.' : 'Drag your finger across me to try.'}</p>
         <div class="tile-ctas">
           <a class="tbtn solid" href=${FUNDRAISER.url} target="_blank" rel="noopener">Donate</a>
           <a class="tbtn" href=${PAGES.shave}>Play the shave game</a>
@@ -1090,7 +1103,8 @@ function DonateTile({ price }) {
           <button type="button" class="lb-copy" onClick=${copy}>${copied ? 'Copied' : 'Copy'}</button>
         </div>
       </div>
-      <canvas ref=${ref} class="tile-art" width=${N} height=${N} role="img" aria-label="Pixel Joash getting his hair clipped"></canvas>
+      <div class="tile-art-wrap" aria-hidden="false"><span class="tile-block" aria-hidden="true"></span>
+        <canvas ref=${ref} class="tile-art" width=${N} height=${N} role="img" aria-label="Pixel Joash getting his hair clipped"></canvas></div>
     </section>`;
 }
 
@@ -1107,12 +1121,17 @@ function ThemeToggle() {
   </button>`;
 }
 
+// Home is about Joash: who he is first, the fundraiser under "Right now".
 function Home({ boards, config }) {
   return html`
-    <div class="simple">
-      <h1 class="name">Hi, I'm <em>Joash.</em></h1>
+    <div class="home">
+      <section class="intro" aria-labelledby="hi">
+        <h1 class="name" id="hi">Hi, I'm <em>Joash.</em></h1>
+        <p class="lede">When I start something, I get obsessed with seeing it through from start to finish. I love building things, online or with my hands, and I'm always picking up new skills, from finance to writing software.</p>
+      </section>
+      <h2 class="label section-label">Right now</h2>
       <${DonateTile} price=${config.tokenPrice} />
-      <${MiniBoards} boards=${boards} sample=${config.sample} />
+      <${MiniBoard} id="shaves" title="Fastest shaves" rows=${boards.shavers} val=${r => fmtTime(r.secs) + 's'} none="No times yet." sample=${config.sample} />
     </div>`;
 }
 
@@ -1162,8 +1181,9 @@ function App() {
   const [boards, setBoards] = useState({ donors: [], shavers: [] });
   const [config, setConfig] = useState({ tokenPrice: 20, sample: PREVIEW });
   const [offline, setOffline] = useState(false);
+  const lookPending = useRef(null);   // the newest avatar not yet saved, so an older reply can't undo a click
   const apply = useCallback((d) => {
-    if (d.me) setMe(d.me);
+    if (d.me) setMe(lookPending.current ? { ...d.me, look: lookPending.current } : d.me);
     if (d.boards) setBoards(d.boards);
     if (d.config) setConfig(c => ({ ...c, ...d.config }));
     return d;
@@ -1182,9 +1202,10 @@ function App() {
   const actions = useMemo(() => ({
     upload: async (blob, filename, pv) => apply(await api.upload(blob, filename, pv)).result,
     setLook: (look) => {
+      lookPending.current = look;
       setMe(m => ({ ...m, look }));
       clearTimeout(lookTimer.current);
-      lookTimer.current = setTimeout(() => api.profile({ look }).then(apply, () => {}), 500);
+      lookTimer.current = setTimeout(() => api.profile({ look }).then(d => { if (lookPending.current === look) lookPending.current = null; apply(d); }, () => {}), 500);
     },
     setName: async (name) => apply(await api.profile({ name })),
     start: async (mode) => apply(await api.start(mode)),
@@ -1192,11 +1213,11 @@ function App() {
   }), [api, apply]);
 
   return html`
-    <header class=${'topbar' + (route === 'shave' ? ' wide' : '')}>
+    <header class="topbar">
       <div class="topbar-in">
-        <a href=${PAGES.home} class="home-link"><${PixelAvatar} look=${JOASH} size=${28} label="" />Joash Jobson</a>
+        <a href=${PAGES.home} class="home-link" aria-current=${route === 'home' ? 'page' : null}><${PixelAvatar} look=${JOASH} size=${28} label="" />Joash Jobson</a>
         <nav class="toplinks" aria-label="Main">
-          <a href=${PAGES.shave} aria-current=${route === 'shave' ? 'page' : null}>Shave</a>
+          <a href=${PAGES.shave} aria-current=${route === 'shave' ? 'page' : null}>Shave game</a>
           <${ThemeToggle} />
         </nav>
       </div>

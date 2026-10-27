@@ -359,7 +359,9 @@ export class Store extends DurableObject {
         .map(r => ({ ...row(r), secs: r.best_ms / 1000 }))
     };
   }
-  view(player, extra = {}) { return { ...extra, me: this.me(player), boards: this.boards(player), config: { tokenPrice: this.cfg.price, sample: false } }; }
+  // The home page's numbers: everything donated through the site, and by how many people
+  totals() { const t = this.one('SELECT COALESCE(SUM(donated_cents), 0) AS c, COUNT(*) AS n FROM players WHERE donated_cents > 0'); return { raised: t.c / 100, donors: t.n }; }
+  view(player, extra = {}) { return { ...extra, me: this.me(player), boards: this.boards(player), config: { tokenPrice: this.cfg.price, sample: false, ...this.totals() } }; }
 
   state(player) { return this.view(player); }
 
